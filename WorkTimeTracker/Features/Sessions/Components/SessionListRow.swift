@@ -15,7 +15,7 @@ struct SessionListRow: View {
 
                 Text(AppFormatters.durationText(from: session.durationSeconds))
                     .font(.callout.monospacedDigit())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppColors.secondaryText)
             }
 
             HStack {
@@ -27,14 +27,14 @@ struct SessionListRow: View {
                 }
             }
             .font(.caption)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(AppColors.secondaryText)
 
             HStack(spacing: AppSpacing.md) {
                 Text("Ставка: \(rateText)")
                 Text("Доход: \(incomeText)")
             }
             .font(.caption)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(AppColors.secondaryText)
 
             if let note = session.note, note.isEmpty == false {
                 Text(note)
@@ -44,7 +44,7 @@ struct SessionListRow: View {
             if session.tags.isEmpty == false {
                 Text(session.tags.joined(separator: ", "))
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppColors.secondaryText)
             }
         }
         .padding(.vertical, AppSpacing.xs)

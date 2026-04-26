@@ -12,10 +12,19 @@ DerivedData/
 *.xcodeproj/xcuserdata/
 *.xcuserdatad/
 *.xcuserstate
+*.xcresult
 
 # Local build caches
 .build-cache/
 .build-scratch/
+BuildArtifacts/
+ModuleCache.noindex/
+SourcePackages/
+swiftpm-module-cache/
+clang-module-cache/
+*.dSYM/
+*.dmg
+*.app
 
 # App-specific local files
 *.log

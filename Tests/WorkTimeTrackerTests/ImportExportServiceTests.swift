@@ -132,6 +132,37 @@ struct ImportExportServiceTests {
             try context.importService.validate(snapshot: snapshot)
         }
     }
+
+    @Test
+    func backupCreatesJsonFileOnDisk() throws {
+        let context = try ImportExportTestContext()
+        let backupURL = try context.backupService.createBackup()
+
+        #expect(FileManager.default.fileExists(atPath: backupURL.path))
+        #expect(backupURL.pathExtension == "json")
+    }
+
+    @Test
+    func automaticBackupKeepsOnlyNewestTwentyFiles() throws {
+        let context = try ImportExportTestContext()
+        let settings = try context.settingsRepository.fetchOrCreateSettings()
+        settings.autoBackupEnabled = true
+        settings.autoBackupDirectoryPath = context.backupDirectory.path
+        settings.autoBackupDirectoryBookmark = nil
+        try context.settingsRepository.save()
+
+        for _ in 0..<25 {
+            _ = try context.backupService.createAutomaticBackupIfEnabled()
+        }
+
+        let storedBackups = try FileManager.default.contentsOfDirectory(
+            at: context.backupDirectory,
+            includingPropertiesForKeys: nil
+        )
+        .filter { $0.lastPathComponent.hasPrefix("backup-") && $0.pathExtension == "json" }
+
+        #expect(storedBackups.count == 20)
+    }
 }
 
 @MainActor
@@ -142,14 +173,17 @@ private struct ImportExportTestContext {
     let settingsRepository: SettingsRepository
     let dayNoteRepository: DayNoteRepository
     let exportService: ExportService
+    let backupService: BackupService
     let importService: ImportService
+    let backupDirectory: URL
 
     init() throws {
         let schema = Schema([
             Project.self,
             WorkSession.self,
             AppSettings.self,
-            DayNote.self
+            DayNote.self,
+            Tag.self
         ])
         let configuration = ModelConfiguration(
             "WorkTimeTrackerImportExportTests",
@@ -163,18 +197,30 @@ private struct ImportExportTestContext {
         sessionRepository = SessionRepository(modelContext: modelContext)
         settingsRepository = SettingsRepository(modelContext: modelContext)
         dayNoteRepository = DayNoteRepository(modelContext: modelContext)
+        let tagRepository = TagRepository(modelContext: modelContext)
+        backupDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("WorkTimeTrackerBackupTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: backupDirectory, withIntermediateDirectories: true)
+        let applicationSupportDirectory = backupDirectory
         exportService = ExportService(
             projectRepository: projectRepository,
             sessionRepository: sessionRepository,
             settingsRepository: settingsRepository,
             dayNoteRepository: dayNoteRepository,
+            tagRepository: tagRepository,
             sessionCalculator: SessionCalculator()
+        )
+        backupService = BackupService(
+            exportService: exportService,
+            settingsRepository: settingsRepository,
+            applicationSupportDirectoryProvider: { applicationSupportDirectory }
         )
         importService = ImportService(
             projectRepository: projectRepository,
             sessionRepository: sessionRepository,
             settingsRepository: settingsRepository,
-            dayNoteRepository: dayNoteRepository
+            dayNoteRepository: dayNoteRepository,
+            tagRepository: tagRepository
         )
     }
 }

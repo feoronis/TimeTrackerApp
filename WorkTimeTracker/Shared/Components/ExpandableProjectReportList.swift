@@ -78,14 +78,15 @@ private struct ProjectBreakdownHeader: View {
             VStack(alignment: .leading, spacing: AppSpacing.xs) {
                 Text(row.projectName)
                     .font(.headline)
+                    .foregroundStyle(AppColors.primaryText)
 
                 Text("\(row.sessionCount) сессий")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppColors.secondaryText)
 
                 Text("Средняя ставка: \(AppFormatters.currencyText(row.averageInformationalRate, currencyCode: currencyCode))")
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppColors.secondaryText)
             }
 
             Spacer()
@@ -93,10 +94,11 @@ private struct ProjectBreakdownHeader: View {
             VStack(alignment: .trailing, spacing: AppSpacing.xs) {
                 Text(AppFormatters.durationText(from: row.totalDurationSeconds))
                     .font(.callout.monospacedDigit())
+                    .foregroundStyle(AppColors.primaryText)
 
                 Text(AppFormatters.currencyText(row.income, currencyCode: currencyCode))
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppColors.secondaryText)
             }
         }
     }
@@ -112,23 +114,26 @@ private struct SessionBreakdownRow: View {
                 HStack(spacing: AppSpacing.sm) {
                     Text(AppFormatters.timeText(session.startTime))
                         .font(.callout.monospacedDigit())
+                        .foregroundStyle(AppColors.primaryText)
 
                     Text("-")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(AppColors.secondaryText)
 
                     Text(session.endTime.map(AppFormatters.timeText) ?? "Активна")
                         .font(.callout.monospacedDigit())
+                        .foregroundStyle(AppColors.primaryText)
                 }
 
                 if let note = session.note, note.isEmpty == false {
                     Text(note)
                         .font(.caption)
+                        .foregroundStyle(AppColors.primaryText)
                 }
 
                 if session.tags.isEmpty == false {
                     Text(session.tags.joined(separator: ", "))
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(AppColors.secondaryText)
                 }
             }
 
@@ -137,14 +142,15 @@ private struct SessionBreakdownRow: View {
             VStack(alignment: .trailing, spacing: AppSpacing.xs) {
                 Text(AppFormatters.durationText(from: session.durationSeconds))
                     .font(.caption.monospacedDigit())
+                    .foregroundStyle(AppColors.primaryText)
 
                 Text(AppFormatters.currencyText(session.income, currencyCode: currencyCode))
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppColors.secondaryText)
 
                 Text(AppFormatters.currencyText(session.hourlyRate, currencyCode: currencyCode))
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppColors.secondaryText)
             }
         }
     }

@@ -7,14 +7,16 @@ struct AppDataSnapshot: Codable {
     let projects: [ProjectSnapshot]
     let sessions: [WorkSessionSnapshot]
     let dayNotes: [DayNoteSnapshot]
+    let tags: [TagSnapshot]
 
     init(
-        version: Int = 1,
+        version: Int = 2,
         exportedAt: Date = .now,
         settings: AppSettingsSnapshot?,
         projects: [ProjectSnapshot],
         sessions: [WorkSessionSnapshot],
-        dayNotes: [DayNoteSnapshot]
+        dayNotes: [DayNoteSnapshot],
+        tags: [TagSnapshot] = []
     ) {
         self.version = version
         self.exportedAt = exportedAt
@@ -22,6 +24,28 @@ struct AppDataSnapshot: Codable {
         self.projects = projects
         self.sessions = sessions
         self.dayNotes = dayNotes
+        self.tags = tags
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case version
+        case exportedAt
+        case settings
+        case projects
+        case sessions
+        case dayNotes
+        case tags
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        version = try container.decodeIfPresent(Int.self, forKey: .version) ?? 1
+        exportedAt = try container.decodeIfPresent(Date.self, forKey: .exportedAt) ?? .now
+        settings = try container.decodeIfPresent(AppSettingsSnapshot.self, forKey: .settings)
+        projects = try container.decodeIfPresent([ProjectSnapshot].self, forKey: .projects) ?? []
+        sessions = try container.decodeIfPresent([WorkSessionSnapshot].self, forKey: .sessions) ?? []
+        dayNotes = try container.decodeIfPresent([DayNoteSnapshot].self, forKey: .dayNotes) ?? []
+        tags = try container.decodeIfPresent([TagSnapshot].self, forKey: .tags) ?? []
     }
 }
 
@@ -35,8 +59,8 @@ struct AppSettingsSnapshot: Codable {
     let longTimerReminderMinutes: Int
     let iCloudSyncEnabled: Bool
     let autoBackupEnabled: Bool
+    let autoBackupDirectoryPath: String?
     let themeMode: String
-    let accentColorName: String
     let liquidGlassEnabled: Bool
     let createdAt: Date
     let updatedAt: Date
@@ -51,8 +75,8 @@ struct AppSettingsSnapshot: Codable {
         longTimerReminderMinutes: Int,
         iCloudSyncEnabled: Bool,
         autoBackupEnabled: Bool,
+        autoBackupDirectoryPath: String?,
         themeMode: String,
-        accentColorName: String,
         liquidGlassEnabled: Bool,
         createdAt: Date,
         updatedAt: Date
@@ -66,8 +90,8 @@ struct AppSettingsSnapshot: Codable {
         self.longTimerReminderMinutes = longTimerReminderMinutes
         self.iCloudSyncEnabled = iCloudSyncEnabled
         self.autoBackupEnabled = autoBackupEnabled
+        self.autoBackupDirectoryPath = autoBackupDirectoryPath
         self.themeMode = themeMode
-        self.accentColorName = accentColorName
         self.liquidGlassEnabled = liquidGlassEnabled
         self.createdAt = createdAt
         self.updatedAt = updatedAt
@@ -83,8 +107,8 @@ struct AppSettingsSnapshot: Codable {
         longTimerReminderMinutes = settings.longTimerReminderMinutes
         iCloudSyncEnabled = settings.iCloudSyncEnabled
         autoBackupEnabled = settings.autoBackupEnabled
+        autoBackupDirectoryPath = settings.autoBackupDirectoryPath
         themeMode = settings.themeMode
-        accentColorName = settings.resolvedAccentColorName
         liquidGlassEnabled = settings.liquidGlassEnabled
         createdAt = settings.createdAt
         updatedAt = settings.updatedAt
@@ -147,6 +171,9 @@ struct WorkSessionSnapshot: Codable {
     let tags: [String]
     let customHourlyRate: Decimal?
     let resolvedHourlyRateSnapshot: Decimal
+    let fixedIncomeAmount: Decimal?
+    let pausedAt: Date?
+    let accumulatedPausedSeconds: TimeInterval
     let createdAt: Date
     let updatedAt: Date
 
@@ -160,6 +187,9 @@ struct WorkSessionSnapshot: Codable {
         tags: [String],
         customHourlyRate: Decimal?,
         resolvedHourlyRateSnapshot: Decimal,
+        fixedIncomeAmount: Decimal? = nil,
+        pausedAt: Date? = nil,
+        accumulatedPausedSeconds: TimeInterval = 0,
         createdAt: Date,
         updatedAt: Date
     ) {
@@ -172,6 +202,9 @@ struct WorkSessionSnapshot: Codable {
         self.tags = tags
         self.customHourlyRate = customHourlyRate
         self.resolvedHourlyRateSnapshot = resolvedHourlyRateSnapshot
+        self.fixedIncomeAmount = fixedIncomeAmount
+        self.pausedAt = pausedAt
+        self.accumulatedPausedSeconds = accumulatedPausedSeconds
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
@@ -186,8 +219,72 @@ struct WorkSessionSnapshot: Codable {
         tags = session.tags
         customHourlyRate = session.customHourlyRate
         resolvedHourlyRateSnapshot = session.resolvedHourlyRateSnapshot
+        fixedIncomeAmount = session.fixedIncomeAmount
+        pausedAt = session.pausedAt
+        accumulatedPausedSeconds = session.accumulatedPausedSeconds
         createdAt = session.createdAt
         updatedAt = session.updatedAt
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case projectID
+        case startTime
+        case endTime
+        case durationSeconds
+        case note
+        case tags
+        case customHourlyRate
+        case resolvedHourlyRateSnapshot
+        case fixedIncomeAmount
+        case pausedAt
+        case accumulatedPausedSeconds
+        case createdAt
+        case updatedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        projectID = try container.decodeIfPresent(UUID.self, forKey: .projectID)
+        startTime = try container.decode(Date.self, forKey: .startTime)
+        endTime = try container.decodeIfPresent(Date.self, forKey: .endTime)
+        durationSeconds = try container.decode(TimeInterval.self, forKey: .durationSeconds)
+        note = try container.decodeIfPresent(String.self, forKey: .note)
+        tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
+        customHourlyRate = try container.decodeIfPresent(Decimal.self, forKey: .customHourlyRate)
+        resolvedHourlyRateSnapshot = try container.decode(Decimal.self, forKey: .resolvedHourlyRateSnapshot)
+        fixedIncomeAmount = try container.decodeIfPresent(Decimal.self, forKey: .fixedIncomeAmount)
+        pausedAt = try container.decodeIfPresent(Date.self, forKey: .pausedAt)
+        accumulatedPausedSeconds = try container.decodeIfPresent(TimeInterval.self, forKey: .accumulatedPausedSeconds) ?? 0
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        updatedAt = try container.decode(Date.self, forKey: .updatedAt)
+    }
+}
+
+struct TagSnapshot: Codable {
+    let id: UUID
+    let name: String
+    let createdAt: Date
+    let updatedAt: Date
+
+    init(
+        id: UUID,
+        name: String,
+        createdAt: Date,
+        updatedAt: Date
+    ) {
+        self.id = id
+        self.name = name
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+
+    init(tag: Tag) {
+        id = tag.id
+        name = tag.name
+        createdAt = tag.createdAt
+        updatedAt = tag.updatedAt
     }
 }
 
@@ -228,9 +325,11 @@ struct ImportSummary {
     let skippedSessions: Int
     let importedDayNotes: Int
     let skippedDayNotes: Int
+    let importedTags: Int
+    let skippedTags: Int
     let settingsMerged: Bool
 
     var summaryText: String {
-        "Импорт завершен: проектов \(importedProjects), пропущено проектов \(skippedProjects), сессий \(importedSessions), пропущено сессий \(skippedSessions), заметок дня \(importedDayNotes), пропущено заметок \(skippedDayNotes)."
+        "Импорт завершен: проектов \(importedProjects), пропущено проектов \(skippedProjects), сессий \(importedSessions), пропущено сессий \(skippedSessions), заметок дня \(importedDayNotes), пропущено заметок \(skippedDayNotes), тегов \(importedTags), пропущено тегов \(skippedTags)."
     }
 }

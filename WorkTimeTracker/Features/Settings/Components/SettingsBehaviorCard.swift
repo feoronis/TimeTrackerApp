@@ -27,12 +27,7 @@ struct SettingsBehaviorCard: View {
                     in: 0...720
                 )
 
-                Toggle("Включить синхронизацию через iCloud", isOn: $viewModel.iCloudSyncEnabled)
                 Toggle("Автоматические резервные копии", isOn: $viewModel.autoBackupEnabled)
-
-                Text(viewModel.cloudSyncStatusText)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
         }
     }

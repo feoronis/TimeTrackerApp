@@ -9,7 +9,7 @@ final class CalendarViewModel {
     private let dayNoteRepository: DayNoteRepository
     private let reportService: ReportService
     private let appEnvironment: AppEnvironment
-    private let calendar: Calendar
+    private var calendar: Calendar
     private var allSessions: [WorkSession] = []
     private var dayNoteSaveTask: Task<Void, Never>?
 
@@ -71,6 +71,7 @@ final class CalendarViewModel {
     func reload() {
         do {
             settings = try settingsRepository.fetchOrCreateSettings()
+            calendar.firstWeekday = settings?.firstDayOfWeek ?? 2
             allSessions = try sessionRepository.fetchAll()
             errorMessage = appEnvironment.bootstrapErrorMessage
             rebuildSelectedDay()
@@ -117,6 +118,7 @@ final class CalendarViewModel {
             try dayNoteRepository.save(note: dayNoteText, for: selectedDate)
             let refreshedNote = try dayNoteRepository.fetch(for: selectedDate)
             noteStatus = .saved(refreshedNote?.updatedAt ?? .now)
+            appEnvironment.notifyDataChanged()
             rebuildSelectedDay(dayNoteOverride: refreshedNote)
         } catch {
             noteStatus = .error

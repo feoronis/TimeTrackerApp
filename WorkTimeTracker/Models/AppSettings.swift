@@ -12,8 +12,9 @@ final class AppSettings {
     var longTimerReminderMinutes: Int
     var iCloudSyncEnabled: Bool
     var autoBackupEnabled: Bool
+    var autoBackupDirectoryPath: String?
+    var autoBackupDirectoryBookmark: Data?
     var themeMode: String
-    var accentColorName: String?
     var liquidGlassEnabled: Bool
     var createdAt: Date
     var updatedAt: Date
@@ -28,8 +29,9 @@ final class AppSettings {
         longTimerReminderMinutes: Int = 120,
         iCloudSyncEnabled: Bool = false,
         autoBackupEnabled: Bool = false,
+        autoBackupDirectoryPath: String? = nil,
+        autoBackupDirectoryBookmark: Data? = nil,
         themeMode: String = "system",
-        accentColorName: String? = "blue",
         liquidGlassEnabled: Bool = true,
         createdAt: Date = .now,
         updatedAt: Date = .now
@@ -43,14 +45,11 @@ final class AppSettings {
         self.longTimerReminderMinutes = longTimerReminderMinutes
         self.iCloudSyncEnabled = iCloudSyncEnabled
         self.autoBackupEnabled = autoBackupEnabled
+        self.autoBackupDirectoryPath = autoBackupDirectoryPath
+        self.autoBackupDirectoryBookmark = autoBackupDirectoryBookmark
         self.themeMode = themeMode
-        self.accentColorName = accentColorName
         self.liquidGlassEnabled = liquidGlassEnabled
         self.createdAt = createdAt
         self.updatedAt = updatedAt
-    }
-
-    var resolvedAccentColorName: String {
-        accentColorName ?? "blue"
     }
 }

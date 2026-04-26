@@ -16,6 +16,7 @@ private struct CalendarScene: View {
 
 private struct CalendarContentView: View {
     @State private var viewModel: CalendarViewModel
+    @State private var isPresented = false
 
     init(appEnvironment: AppEnvironment) {
         _viewModel = State(initialValue: CalendarViewModel(appEnvironment: appEnvironment))
@@ -24,30 +25,61 @@ private struct CalendarContentView: View {
     var body: some View {
         @Bindable var viewModel = viewModel
 
-        ScrollView {
-            VStack(alignment: .leading, spacing: AppSpacing.xl) {
-                Text("Calendar")
-                    .font(.system(size: 32, weight: .semibold))
+        GeometryReader { proxy in
+            let contentWidth = max(proxy.size.width - 80, 0)
+            let isCompact = contentWidth < 1_120
+            let isVeryCompact = contentWidth < 980
 
-                if let errorMessage = viewModel.errorMessage {
-                    Text(errorMessage)
-                        .font(.callout)
-                        .foregroundStyle(.red)
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: AppSpacing.xl) {
+                    Text("Календарь")
+                        .font(.system(size: 32, weight: .semibold))
+                        .foregroundStyle(AppColors.primaryText)
+
+                    if let errorMessage = viewModel.errorMessage {
+                        Text(errorMessage)
+                            .font(.callout)
+                            .foregroundStyle(AppColors.errorText)
+                    }
+
+                    Group {
+                        if isVeryCompact {
+                            VStack(alignment: .leading, spacing: AppSpacing.xl) {
+                                CalendarSidebarCard(viewModel: viewModel, availableWidth: contentWidth)
+                                CalendarDetailsPanel(viewModel: viewModel, isCompact: true)
+                            }
+                        } else {
+                            HStack(alignment: .top, spacing: isCompact ? AppSpacing.lg : AppSpacing.xl) {
+                                CalendarSidebarCard(viewModel: viewModel, availableWidth: max(contentWidth - (isCompact ? 360 : 420), 0))
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                                ZStack(alignment: .topTrailing) {
+                                    CalendarDetailsPanel(viewModel: viewModel, isCompact: isCompact)
+                                }
+                                .frame(width: isCompact ? 340 : 420, alignment: .trailing)
+                                .layoutPriority(1)
+                            }
+                        }
+                    }
                 }
-
-                HStack(alignment: .top, spacing: AppSpacing.xl) {
-                    CalendarSidebarCard(viewModel: viewModel)
-                        .frame(minWidth: 720, maxWidth: .infinity)
-
-                    CalendarDetailsPanel(viewModel: viewModel)
-                        .frame(width: 420)
-                }
+                .padding(.horizontal, isCompact ? 24 : 40)
+                .padding(.vertical, AppSpacing.xxl)
+                .opacity(isPresented ? 1 : 0)
+                .offset(y: isPresented ? 0 : 12)
             }
-            .padding(.horizontal, 40)
-            .padding(.vertical, AppSpacing.xxl)
         }
+        .clearFocusOnTap()
+        .background(AppColors.windowBackground)
         .task {
             viewModel.load()
+        }
+        .onAppear {
+            withAnimation(.smooth(duration: 0.36)) {
+                isPresented = true
+            }
+        }
+        .onDisappear {
+            isPresented = false
         }
     }
 }

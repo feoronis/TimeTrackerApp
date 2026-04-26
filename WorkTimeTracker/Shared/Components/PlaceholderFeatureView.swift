@@ -15,10 +15,11 @@ struct PlaceholderFeatureView: View {
                     VStack(alignment: .leading, spacing: AppSpacing.md) {
                         Text("Экран подготовлен")
                             .font(.headline)
+                            .foregroundStyle(AppColors.primaryText)
 
                         Text(description)
                             .font(.body)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(AppColors.secondaryText)
                     }
                 }
 

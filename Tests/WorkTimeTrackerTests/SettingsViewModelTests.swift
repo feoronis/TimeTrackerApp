@@ -19,7 +19,6 @@ struct SettingsViewModelTests {
         viewModel.iCloudSyncEnabled = true
         viewModel.autoBackupEnabled = true
         viewModel.themeMode = .dark
-        viewModel.accentColor = .orange
         viewModel.liquidGlassEnabled = false
 
         viewModel.saveSettings()
@@ -33,7 +32,6 @@ struct SettingsViewModelTests {
         #expect(settings.iCloudSyncEnabled == true)
         #expect(settings.autoBackupEnabled == true)
         #expect(settings.themeMode == "dark")
-        #expect(settings.accentColorName == "orange")
         #expect(settings.liquidGlassEnabled == false)
     }
 
@@ -61,7 +59,8 @@ private struct SettingsTestContext {
             Project.self,
             WorkSession.self,
             AppSettings.self,
-            DayNote.self
+            DayNote.self,
+            Tag.self
         ])
         let configuration = ModelConfiguration(
             "WorkTimeTrackerSettingsTests",

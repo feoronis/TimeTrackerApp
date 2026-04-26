@@ -16,6 +16,7 @@ private struct ReportsScene: View {
 
 private struct ReportsContentView: View {
     @State private var viewModel: ReportsViewModel
+    @State private var isPresented = false
 
     init(appEnvironment: AppEnvironment) {
         _viewModel = State(initialValue: ReportsViewModel(appEnvironment: appEnvironment))
@@ -24,32 +25,39 @@ private struct ReportsContentView: View {
     var body: some View {
         @Bindable var viewModel = viewModel
 
-        ScrollView {
+        ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: AppSpacing.xl) {
-                Text("Отчеты")
-                    .font(.largeTitle)
-                    .fontWeight(.semibold)
+                Text("Отчёты")
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundStyle(AppColors.primaryText)
 
                 if let errorMessage = viewModel.errorMessage {
                     Text(errorMessage)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(AppColors.errorText)
                 }
 
                 ReportPeriodPicker(viewModel: viewModel)
                 ReportSummaryCards(viewModel: viewModel)
                 ReportCharts(viewModel: viewModel)
-
-                ExpandableProjectReportList(
-                    title: "Проекты за период",
-                    projectRows: viewModel.report?.projectRows ?? [],
-                    currencyCode: viewModel.currencyCode,
-                    expandedProjectIDs: $viewModel.expandedProjectIDs
-                )
+                ReportsProjectsTable(viewModel: viewModel)
             }
-            .padding(AppSpacing.xxl)
+            .padding(.horizontal, 32)
+            .padding(.vertical, 28)
+            .opacity(isPresented ? 1 : 0)
+            .offset(y: isPresented ? 0 : 12)
         }
+        .clearFocusOnTap()
+        .background(AppColors.windowBackground)
         .task {
             viewModel.load()
+        }
+        .onAppear {
+            withAnimation(.smooth(duration: 0.36)) {
+                isPresented = true
+            }
+        }
+        .onDisappear {
+            isPresented = false
         }
     }
 }

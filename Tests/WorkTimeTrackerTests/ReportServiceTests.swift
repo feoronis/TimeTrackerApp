@@ -81,4 +81,28 @@ struct ReportServiceTests {
         #expect(report.projectRows.first?.projectName == "Проект A")
         #expect(report.summary.totalIncome == Decimal(150))
     }
+
+    @Test
+    func todayReportBuildsHourlySeries() {
+        let calendar = Calendar(identifier: .gregorian)
+        let startOfDay = calendar.startOfDay(for: Date(timeIntervalSince1970: 1_700_000_000))
+        let project = Project(name: "Проект A")
+        let session = WorkSession(
+            project: project,
+            startTime: startOfDay.addingTimeInterval(2 * 3600),
+            endTime: startOfDay.addingTimeInterval(3 * 3600),
+            durationSeconds: 3600,
+            resolvedHourlyRateSnapshot: Decimal(100)
+        )
+
+        let report = reportService.buildPeriodReport(
+            sessions: [session],
+            filter: ReportFilter(period: .custom, customStartDate: startOfDay, customEndDate: startOfDay),
+            calendar: calendar
+        )
+
+        #expect(report.chartGranularity == .hour)
+        #expect(report.timeByDate.count == 24)
+        #expect(report.timeByDate.contains { $0.date == startOfDay.addingTimeInterval(2 * 3600) && $0.totalDurationSeconds == 3600 })
+    }
 }
