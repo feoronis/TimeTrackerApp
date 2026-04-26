@@ -67,7 +67,11 @@ struct SessionCalculator {
     }
 
     func sessionIncome(_ session: WorkSession) -> Decimal {
-        income(
+        if let fixedIncomeAmount = session.fixedIncomeAmount {
+            return fixedIncomeAmount
+        }
+
+        return income(
             durationSeconds: session.durationSeconds,
             hourlyRate: session.resolvedHourlyRateSnapshot
         )
@@ -78,9 +82,17 @@ struct SessionCalculator {
         end: Date,
         sessionCustomRate: Decimal?,
         projectRate: Decimal?,
-        defaultRate: Decimal
+        defaultRate: Decimal,
+        roundingMode: RoundingMode = .none,
+        roundingMinutes: Int = 0,
+        fixedIncomeAmount: Decimal? = nil
     ) -> CompletedSessionValues {
-        let duration = durationSeconds(start: start, end: end)
+        let rawDuration = durationSeconds(start: start, end: end)
+        let duration = billableDurationSeconds(
+            rawDurationSeconds: rawDuration,
+            roundingMode: roundingMode,
+            roundingMinutes: roundingMinutes
+        )
         let resolvedRate = resolvedRate(
             sessionCustomRate: sessionCustomRate,
             projectRate: projectRate,
@@ -90,7 +102,7 @@ struct SessionCalculator {
         return CompletedSessionValues(
             durationSeconds: duration,
             resolvedHourlyRateSnapshot: resolvedRate,
-            income: income(durationSeconds: duration, hourlyRate: resolvedRate)
+            income: fixedIncomeAmount ?? income(durationSeconds: duration, hourlyRate: resolvedRate)
         )
     }
 }

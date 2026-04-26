@@ -2,10 +2,11 @@ import Foundation
 
 struct ProjectDraft {
     var name = ""
-    var colorHex = "#4C8BF5"
+    var colorHex = "#7C5CFF"
     var iconName = "folder"
     var hourlyRateText = ""
     var notes = ""
+    var isArchived = false
 
     init() {}
 
@@ -15,5 +16,6 @@ struct ProjectDraft {
         iconName = project.iconName ?? "folder"
         hourlyRateText = project.hourlyRate.map { "\($0)" } ?? ""
         notes = project.notes ?? ""
+        isArchived = project.isArchived
     }
 }

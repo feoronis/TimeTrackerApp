@@ -7,12 +7,15 @@ let package = Package(
         .macOS(.v14)
     ],
     products: [
-        .executable(name: "WorkTimeTracker", targets: ["WorkTimeTracker"])
+        .executable(name: "TimeTrack", targets: ["WorkTimeTracker"])
     ],
     targets: [
         .executableTarget(
             name: "WorkTimeTracker",
-            path: "WorkTimeTracker"
+            path: "WorkTimeTracker",
+            resources: [
+                .process("Resources")
+            ]
         ),
         .testTarget(
             name: "WorkTimeTrackerTests",

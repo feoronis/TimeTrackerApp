@@ -11,7 +11,7 @@ struct SettingsDataCard: View {
 
                 Text("Экспорт и импорт работают в merge-режиме: существующие записи не удаляются, а дубликаты по UUID пропускаются.")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppColors.secondaryText)
 
                 HStack(spacing: AppSpacing.md) {
                     Button("Экспорт JSON") {

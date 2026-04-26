@@ -7,18 +7,26 @@ struct TagChip: View {
 
     var body: some View {
         Text(title)
-            .font(.callout.weight(.medium))
-            .foregroundStyle(isSelected ? Color.primary : Color.secondary)
-            .padding(.horizontal, AppSpacing.md)
-            .padding(.vertical, AppSpacing.sm)
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(AppearancePreferences.isDarkMode ? AppColors.inverseText : AppColors.primaryText)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
             .background(
-                Capsule(style: .continuous)
-                    .fill(color.opacity(isSelected ? 0.24 : 0.12))
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(color.opacity(isSelected ? (AppearancePreferences.isLiquidGlassEnabled ? 0.28 : 0.34) : (AppearancePreferences.isLiquidGlassEnabled ? 0.18 : 0.24)))
             )
             .overlay {
-                Capsule(style: .continuous)
-                    .strokeBorder(color.opacity(isSelected ? 0.34 : 0.18), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(
+                        color.opacity(isSelected ? 0.98 : (AppearancePreferences.isLiquidGlassEnabled ? 0.56 : 0.42)),
+                        lineWidth: isSelected ? 2 : 1
+                    )
+            }
+            .overlay {
+                if AppearancePreferences.isLiquidGlassEnabled {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(AppColors.cardInnerHighlight.opacity(AppearancePreferences.isDarkMode ? 0.8 : 0.4))
+                }
             }
     }
 }
-

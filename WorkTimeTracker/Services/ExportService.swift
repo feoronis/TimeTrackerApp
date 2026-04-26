@@ -19,6 +19,7 @@ struct ExportService {
     private let sessionRepository: SessionRepository
     private let settingsRepository: SettingsRepository
     private let dayNoteRepository: DayNoteRepository
+    private let tagRepository: TagRepository
     private let sessionCalculator: SessionCalculator
 
     init(
@@ -26,12 +27,14 @@ struct ExportService {
         sessionRepository: SessionRepository,
         settingsRepository: SettingsRepository,
         dayNoteRepository: DayNoteRepository,
+        tagRepository: TagRepository,
         sessionCalculator: SessionCalculator
     ) {
         self.projectRepository = projectRepository
         self.sessionRepository = sessionRepository
         self.settingsRepository = settingsRepository
         self.dayNoteRepository = dayNoteRepository
+        self.tagRepository = tagRepository
         self.sessionCalculator = sessionCalculator
     }
 
@@ -61,12 +64,14 @@ struct ExportService {
         let projects = try projectRepository.fetchAll()
         let sessions = try sessionRepository.fetchAll()
         let dayNotes = try dayNoteRepository.fetchAll()
+        let tags = try tagRepository.fetchAll()
 
         return AppDataSnapshot(
             settings: AppSettingsSnapshot(settings: settings),
             projects: projects.map(ProjectSnapshot.init(project:)),
             sessions: sessions.map(WorkSessionSnapshot.init(session:)),
-            dayNotes: dayNotes.map(DayNoteSnapshot.init(dayNote:))
+            dayNotes: dayNotes.map(DayNoteSnapshot.init(dayNote:)),
+            tags: tags.map(TagSnapshot.init(tag:))
         )
     }
 
@@ -99,6 +104,7 @@ struct ExportService {
             "tags",
             "custom_hourly_rate",
             "resolved_hourly_rate_snapshot",
+            "fixed_income_amount",
             "session_income"
         ].joined(separator: ",")
 
@@ -113,6 +119,7 @@ struct ExportService {
                 csvField(session.tags.joined(separator: "|")),
                 csvField(session.customHourlyRate.map(AppFormatters.decimalText) ?? ""),
                 csvField(AppFormatters.decimalText(session.resolvedHourlyRateSnapshot)),
+                csvField(session.fixedIncomeAmount.map(AppFormatters.decimalText) ?? ""),
                 csvField(AppFormatters.decimalText(sessionCalculator.sessionIncome(session)))
             ].joined(separator: ",")
         }

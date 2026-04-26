@@ -10,17 +10,21 @@ final class DashboardViewModel {
     private let projectRepository: ProjectRepository
     private let settingsRepository: SettingsRepository
     private let dayNoteRepository: DayNoteRepository
+    private let tagRepository: TagRepository
     private let reportService: ReportService
     private let appEnvironment: AppEnvironment
     private(set) var projects: [Project] = []
     private(set) var recentSessions: [WorkSession] = []
+    private(set) var availableTags: [Tag] = []
     private(set) var settings: AppSettings?
     private(set) var todaySummary: DaySummaryReport?
     private(set) var yesterdaySummary: DaySummaryReport?
     var selectedProjectID: UUID?
     var sessionNote = ""
-    var tagsText = ""
+    var selectedTagNames: [String] = []
     var customRateText = ""
+    var isCreateTagPresented = false
+    var newTagName = ""
     var errorMessage: String?
 
     init(appEnvironment: AppEnvironment) {
@@ -30,6 +34,7 @@ final class DashboardViewModel {
         self.projectRepository = appEnvironment.projectRepository
         self.settingsRepository = appEnvironment.settingsRepository
         self.dayNoteRepository = appEnvironment.dayNoteRepository
+        self.tagRepository = appEnvironment.tagRepository
         self.reportService = appEnvironment.reportService
         self.timerService = appEnvironment.timerService
     }
@@ -89,6 +94,16 @@ final class DashboardViewModel {
         AppFormatters.currencyText(currentResolvedRate, currencyCode: currencyCode) + "/ч"
     }
 
+    var rateFieldValueText: String {
+        let customRate = timerService.activeSession?.customHourlyRate ?? parseOptionalDecimal(customRateText)
+        let value = customRate ?? currentResolvedRate
+        return AppFormatters.currencyText(value, currencyCode: currencyCode)
+    }
+
+    var hasCustomRateOverride: Bool {
+        timerService.activeSession?.customHourlyRate != nil || parseOptionalDecimal(customRateText) != nil
+    }
+
     var activeTimerDurationText: String {
         AppFormatters.durationText(from: currentElapsedDuration)
     }
@@ -98,12 +113,11 @@ final class DashboardViewModel {
     }
 
     var suggestedTags: [DashboardTagSuggestion] {
-        let defaultTags = ["Frontend", "UI/UX", "WordPress", "Клиент"]
-        let recentTags = Array(Set(recentSessions.flatMap(\.tags))).sorted()
-        let tags = (recentTags + defaultTags).orderedUnique()
-        let activeTags = Set(parsedTags())
+        let recentTags = recentSessions.flatMap(\.tags)
+        let tags = (availableTags.map(\.name) + recentTags).orderedUnique()
+        let activeTags = Set(selectedTagNames)
 
-        return tags.prefix(6).enumerated().map { index, tag in
+        return tags.enumerated().map { index, tag in
             DashboardTagSuggestion(
                 title: tag,
                 colorHex: DashboardTagSuggestion.palette[tag] ?? DashboardTagSuggestion.defaultPalette[index % DashboardTagSuggestion.defaultPalette.count],
@@ -122,6 +136,7 @@ final class DashboardViewModel {
             settings = try settingsRepository.fetchOrCreateSettings()
             projects = try projectRepository.fetchAll(includeArchived: false)
             recentSessions = try sessionRepository.fetchRecent(limit: 8)
+            availableTags = try tagRepository.fetchAll()
             let allSessions = try sessionRepository.fetchAll()
             let today = Date.now
             todaySummary = reportService.buildDaySummary(
@@ -137,7 +152,10 @@ final class DashboardViewModel {
                 dayNote: try dayNoteRepository.fetch(for: yesterday)
             )
 
-            if selectedProjectID == nil {
+            if let activeProjectID = timerService.activeSession?.project?.id {
+                selectedProjectID = activeProjectID
+                customRateText = timerService.activeSession?.customHourlyRate.map(AppFormatters.decimalText) ?? ""
+            } else if selectedProjectID == nil {
                 selectedProjectID = projects.first?.id
             }
 
@@ -165,14 +183,15 @@ final class DashboardViewModel {
             try timerService.startTimer(
                 project: selectedProject,
                 note: sessionNote,
-                tags: parsedTags(),
+                tags: selectedTagNames,
                 customHourlyRate: customRate
             )
 
             sessionNote = ""
-            tagsText = ""
+            selectedTagNames = []
             customRateText = ""
             errorMessage = nil
+            appEnvironment.notifyDataChanged()
             reloadData()
         } catch {
             errorMessage = error.localizedDescription
@@ -183,6 +202,7 @@ final class DashboardViewModel {
         do {
             try timerService.stopActiveTimer()
             errorMessage = nil
+            appEnvironment.notifyDataChanged()
             reloadData()
         } catch {
             errorMessage = error.localizedDescription
@@ -190,19 +210,110 @@ final class DashboardViewModel {
     }
 
     func pauseTimer() {
-        errorMessage = "Пауза появится в следующем обновлении таймера."
+        do {
+            if timerService.activeSession?.isPaused == true {
+                try timerService.resumeActiveTimer()
+            } else {
+                try timerService.pauseActiveTimer()
+            }
+
+            errorMessage = nil
+            appEnvironment.notifyDataChanged()
+            reloadData()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func rateEditingText() -> String {
+        if customRateText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
+            return customRateText
+        }
+
+        if let activeCustomRate = timerService.activeSession?.customHourlyRate {
+            return AppFormatters.decimalText(activeCustomRate)
+        }
+
+        if let activeSession = timerService.activeSession {
+            return AppFormatters.decimalText(activeSession.resolvedHourlyRateSnapshot)
+        }
+
+        return AppFormatters.decimalText(currentResolvedRate)
+    }
+
+    func commitCustomRate(_ rawValue: String) {
+        let trimmedValue = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        let parsedRate = parseOptionalDecimal(trimmedValue)
+
+        guard trimmedValue.isEmpty || parsedRate != nil else {
+            errorMessage = "Ставка должна быть числом."
+            return
+        }
+
+        do {
+            customRateText = trimmedValue
+
+            if timerService.activeSession != nil {
+                try timerService.updateActiveSessionRate(customHourlyRate: parsedRate)
+                appEnvironment.notifyDataChanged()
+            }
+
+            errorMessage = nil
+            reloadData()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     func toggleTag(_ tag: String) {
-        var tags = parsedTags()
-
-        if let index = tags.firstIndex(of: tag) {
-            tags.remove(at: index)
+        if let index = selectedTagNames.firstIndex(of: tag) {
+            selectedTagNames.remove(at: index)
         } else {
-            tags.append(tag)
+            selectedTagNames.append(tag)
+        }
+    }
+
+    func presentCreateTag() {
+        newTagName = ""
+        isCreateTagPresented = true
+    }
+
+    func createTag() {
+        let trimmedName = newTagName.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard trimmedName.isEmpty == false else {
+            errorMessage = "Введите название тега."
+            return
         }
 
-        tagsText = tags.joined(separator: ", ")
+        do {
+            let normalizedName = TagRepository.normalizedName(for: trimmedName)
+
+            if let existingTag = try tagRepository.fetchByNormalizedName(normalizedName) {
+                if selectedTagNames.contains(existingTag.name) == false {
+                    selectedTagNames.append(existingTag.name)
+                }
+            } else {
+                let tag = Tag(name: trimmedName)
+                try tagRepository.insert(tag)
+                selectedTagNames.append(tag.name)
+            }
+
+            errorMessage = nil
+            newTagName = ""
+            isCreateTagPresented = false
+            reloadData()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    var pauseButtonTitle: String {
+        timerService.activeSession?.isPaused == true ? "Продолжить" : "Пауза"
+    }
+
+    var pauseButtonIconName: String {
+        timerService.activeSession?.isPaused == true ? "play" : "pause"
     }
 
     private var currentElapsedDuration: TimeInterval {
@@ -210,7 +321,7 @@ final class DashboardViewModel {
             return 0
         }
 
-        return max(0, timerService.currentDate.timeIntervalSince(activeSession.startTime))
+        return timerService.elapsedDuration(for: activeSession)
     }
 
     private var currentResolvedRate: Decimal {
@@ -243,22 +354,15 @@ final class DashboardViewModel {
 
         return Decimal(string: value.replacingOccurrences(of: ",", with: "."))
     }
-
-    private func parsedTags() -> [String] {
-        tagsText
-            .split(separator: ",")
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { $0.isEmpty == false }
-    }
 }
 
 struct DashboardTagSuggestion: Identifiable {
     static let defaultPalette = ["#4C8BF5", "#FF9F68", "#4FAF92", "#9B7CFF", "#F15D7A", "#F0C15B"]
     static let palette = [
-        "Frontend": "#4C8BF5",
-        "UI/UX": "#9B7CFF",
-        "WordPress": "#4FAF92",
-        "Клиент": "#FF9F68"
+        "Frontend": "#7C5CFF",
+        "UI/UX": "#5B7CFA",
+        "WordPress": "#5CC47D",
+        "Клиент": "#F4D65A"
     ]
 
     let title: String

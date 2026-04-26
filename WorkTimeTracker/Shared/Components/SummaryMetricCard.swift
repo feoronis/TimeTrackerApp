@@ -10,17 +10,18 @@ struct SummaryMetricCard: View {
             VStack(alignment: .leading, spacing: AppSpacing.sm) {
                 Text(title)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppColors.secondaryText)
 
                 Text(value)
                     .font(.title2)
                     .fontWeight(.semibold)
                     .monospacedDigit()
+                    .foregroundStyle(AppColors.primaryText)
 
                 if let subtitle, subtitle.isEmpty == false {
                     Text(subtitle)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(AppColors.secondaryText)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

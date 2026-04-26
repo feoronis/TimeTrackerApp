@@ -12,7 +12,7 @@ Codex must read and follow this file before writing code, refactoring, fixing bu
 
 Build a native macOS application for Apple Silicon that tracks work time, projects, hourly rates, sessions, daily calendar summaries, period reports, income calculations, notes, tags, menu bar timer, local persistence, backups, and iCloud sync.
 
-The application should feel like a high-quality Apple app designed for modern macOS, using SwiftUI, SwiftData, CloudKit, Swift Charts, SF Symbols, native controls, and a Liquid Glass-inspired design language.
+The application should feel like a high-quality Apple productivity app for modern macOS, using SwiftUI, SwiftData, CloudKit, Swift Charts, SF Symbols, native controls, and a strict Glass SaaS + Gradient design language with layered depth, soft translucency, and strong visual hierarchy.
 
 The app is not a web dashboard. It must feel native, fast, calm, polished, and reliable.
 
@@ -81,11 +81,11 @@ Charts: Swift Charts
 Platform: macOS, Apple Silicon first
 Menu bar: MenuBarExtra
 Notifications: UserNotifications
-Design system: native macOS + Liquid Glass-inspired design kit
+Design system: native macOS + Glass SaaS gradient design kit
 Testing: XCTest / Swift Testing where available
 ```
 
-The design system is not optional polish. The UI kit must actively use a Liquid Glass-inspired visual language with reusable materials, layered translucency, soft borders, calm depth, and native macOS controls.
+The design system is not optional polish. The UI kit must actively use the repository design language: glass surfaces, layered depth, soft gradients, neon-accent glow in dark mode, calm spacing, and native macOS controls interpreted through a premium SaaS-like composition.
 
 Do not introduce unnecessary third-party dependencies. Prefer Apple frameworks.
 
@@ -653,7 +653,7 @@ Export CSV
 Create backup
 Theme mode
 Accent color
-Liquid Glass mode if applicable
+Glass gradient mode if applicable
 ```
 
 ## Menu Bar Timer
@@ -687,49 +687,89 @@ Menu bar timer must read from the same TimerService as the main app.
 
 ## Design principles
 
-The app should look like a native Apple productivity app.
+This repository uses a strict visual system. Codex must treat it as mandatory, not inspirational.
 
-Keywords:
-
-```text
-Calm
-Precise
-Glass-like
-Minimal
-Premium
-Readable
-Fast
-Native
-```
-
-Inspired by:
+The target look is:
 
 ```text
-Apple Calendar
-Apple Reminders
-Apple Notes
-Apple Shortcuts
-Timing-style time tracking
-Modern macOS Tahoe Liquid Glass
+Native macOS productivity app
++ Glass SaaS layering
++ Soft gradients
++ Neon-accent glow in dark mode
++ Premium calm depth instead of hard borders
 ```
 
-## Layout
-
-Use:
+Codex must think:
 
 ```text
-NavigationSplitView
-Sidebar navigation
-Cards for high-level stats
-Tables for detailed records
-Inspector/detail panels for editing
-Sheets for create/edit flows
-Popovers for quick actions
+I am not drawing flat blocks.
+I am building visual hierarchy through light, air, layering, grouping, and depth.
 ```
 
-## Spacing
+If an existing screen is being created or refactored, Codex must prefer this design language over generic SwiftUI defaults.
 
-Create design tokens:
+## Global visual rules
+
+Always do:
+
+```text
+Use layered surfaces instead of flat fills
+Use gradients for primary emphasis
+Use glow in dark mode for active and highlighted elements
+Use soft separation through shadow, translucency, and contrast
+Use generous spacing and clear grouping
+Keep the interface calm, premium, and readable
+```
+
+Never do:
+
+```text
+Pure black backgrounds (#000000)
+Harsh borders
+Flat UI with plain gray blocks
+Chaotic layouts
+Overloaded containers mixing unrelated content
+Multiple competing primary actions in one focus area
+```
+
+## Visual hierarchy formula
+
+Default decision order:
+
+```text
+Depth (layers)
++ Spacing (air)
++ Glow (focus)
++ Grid (structure)
+= final UI
+```
+
+If Codex is unsure, choose:
+
+```text
+More soft
+More deep
+More luminous in dark mode
+More structured
+```
+
+## Design tokens
+
+Create and reuse centralized tokens in the design system. Do not scatter magic values across views.
+
+Required token families:
+
+```text
+AppSpacing
+AppRadii
+AppColors
+AppGradients
+AppShadows
+AppMaterials
+AppTypography
+```
+
+Recommended core values:
 
 ```swift
 enum AppSpacing {
@@ -742,49 +782,370 @@ enum AppSpacing {
 }
 ```
 
-Do not hardcode random spacing everywhere.
+Recommended additional tokens:
+
+```swift
+enum AppRadii {
+    static let small: CGFloat = 10
+    static let medium: CGFloat = 16
+    static let large: CGFloat = 20
+}
+```
+
+Design color foundation:
+
+```text
+Dark background base: #020617
+Dark background gradient end: #0F172A
+Dark panel/card tint: rgba(30, 41, 59, 0.6)
+Light background: #F8FAFC
+Light panel: #FFFFFF
+Primary accent: #5B7CFA
+Secondary accent: #8F5CF6
+Success: #22C55E
+Warning: #F59E0B
+Error: #EF4444
+Dark primary text: #E2E8F0
+Dark secondary text: #94A3B8
+Dark muted text: #64748B
+Border substitute: rgba(255,255,255,0.04-0.08)
+```
+
+Use these values through semantic wrappers in Swift, not as repeated inline literals.
+
+## Layering system
+
+Every screen should be composed through layers:
+
+```text
+Layer 0: background
+Layer 1: primary surface
+Layer 2: cards and grouped content
+Layer 3: interactive or active states
+```
+
+Layer guidance:
+
+```text
+Layer 0 dark: deep blue-black gradient from #020617 to #0F172A
+Layer 0 light: soft light background around #F8FAFC
+Layer 1: glass-like main panel with blur, translucency, and calm contrast
+Layer 2: cards with tinted fills, subtle highlight border, rounded corners, and depth shadow
+Layer 3: hover, selected, focused, and active states using gradient or accent-tinted overlays
+```
+
+Primary surfaces should read as glass or softly frosted, not as opaque slabs.
+
+## Layout and composition
+
+Default app shell:
+
+```text
+[ Sidebar ] [ Main Content ]
+```
+
+Layout rules:
+
+```text
+Sidebar width: 220-260px
+Main content horizontal padding: 24-32px
+Comfortable content max width: about 1200-1400px where appropriate
+Section gap: 24px
+Inner block padding: 16-24px
+Small element gaps: 8-12px
+```
+
+Every screen should generally follow this order:
+
+```text
+Header (title + key actions)
+Filters / controls
+KPI / summary row
+Main content (table, calendar, chart, detail)
+Secondary content (notes, inspector, supporting details)
+```
+
+Grouping rules:
+
+```text
+One container = one task
+KPI blocks separate from tables
+Tables separate from charts
+Actions separate from dense data
+Avoid long mixed-content slabs
+Avoid more than two levels of visual nesting
+```
+
+If layout feels cramped, increase spacing before adding more borders or separators.
+
+## Sidebar
+
+The sidebar is a first-class visual anchor, not a default list.
+
+Rules:
+
+```text
+Use a dark vertical gradient in dark mode, approximately #0B0F1F to #0F172A
+Active item uses the primary gradient and visible glow
+Hover uses a soft translucent highlight
+Keep items aligned, calm, and evenly spaced
+Do not make the sidebar visually flat
+```
+
+## Cards and surfaces
+
+Cards must feel elevated through depth and translucency, not through thick outlines.
+
+Card rules:
+
+```text
+Corner radius: 16-20px
+Padding: 16-24px
+Use tinted or glass-like backgrounds
+Prefer soft shadow + subtle highlight edge over explicit stroke
+Avoid nested card-inside-card-inside-card compositions
+```
+
+Recommended dark card treatment:
+
+```text
+Background: rgba(30, 41, 59, 0.6)
+Highlight edge: rgba(255,255,255,0.06)
+Shadow: deep outer shadow + subtle inner highlight
+```
+
+KPI cards should be uniform in width and height inside the same row.
+
+## Hero timer and KPI blocks
+
+The active timer hero is the brightest focal point on the dashboard.
+
+Rules:
+
+```text
+Use the primary gradient or an accent-tinted gradient background
+Use large monospaced digits
+Make the timer visually dominate nearby KPI content
+Use glow in dark mode
+```
+
+KPI row rules:
+
+```text
+Use 4 or 5 cards in a row when space allows
+Keep equal heights
+Typical height: about 100-120px
+Value is the focal point
+Label is secondary
+Icon sits top-left or left-aligned
+```
 
 ## Typography
 
-Use system fonts.
+Use system fonts, but with deliberate hierarchy and stronger numerical emphasis.
 
 Recommended hierarchy:
 
 ```text
 Large title: screen title
 Title 2/3: section headers
-Headline: card numbers and table section names
+Headline: KPI values and important subheaders
 Body: main content
 Callout/Caption: secondary metadata
-Monospaced digits: timers, durations, money values
+Monospaced digits: timers, durations, money values, row metrics
 ```
 
-Timer values should use monospaced digits.
-
-## Colors
-
-Use semantic colors first:
+Typography color guidance:
 
 ```text
-primary
-secondary
-background
-secondaryBackground
-accentColor
-separator
+Primary text dark: #E2E8F0
+Primary text light: #1F2937
+Secondary text: #94A3B8
+Muted text: #64748B
 ```
 
-Project colors may be custom, but must work in both light and dark mode.
+Timer values, money, and key metrics should use monospaced digits and may use a subtle glow in dark mode.
 
-Avoid hardcoded colors unless they are part of the design system.
+## Colors and gradients
+
+The primary brand emphasis must use this gradient:
+
+```text
+linear-gradient(135deg, #5B7CFA, #8F5CF6)
+```
+
+Use it for:
+
+```text
+Primary buttons
+Active navigation states
+Timer hero
+Focused highlights
+Selected key controls
+Important chart accents
+```
+
+Project colors may be custom, but must still harmonize with the system in light and dark mode.
+
+## Glow, shadows, and separation
+
+Light and shadow are the main separation tool.
+
+Rules:
+
+```text
+Do not rely on hard borders
+Do not use heavy flat gray fills
+Use glow for active or focused elements in dark mode
+Use soft deep shadows for cards and hero blocks
+Use subtle inner highlights where appropriate
+```
+
+Typical patterns:
+
+```text
+Card: deep outer shadow + faint inner highlight
+Active element: accent outline glow + soft accent bloom
+Primary button: colored shadow based on the primary gradient
+```
+
+## Buttons
+
+Create reusable button styles and apply them consistently.
+
+Required button families:
+
+```text
+Primary action
+Secondary action
+Destructive action
+Timer start
+Timer stop
+Toolbar icon action
+```
+
+Button rules:
+
+```text
+Primary uses the primary gradient
+Height is usually 40px
+Corner radius is about 10px
+Primary text is white
+Secondary actions are translucent or low-emphasis, not flat default buttons
+Danger actions use the error palette
+Only one visually dominant primary action per focus area
+```
+
+Timer start/stop buttons must be visually obvious and easy to click.
+
+## Inputs, forms, and toggles
+
+Forms must feel breathable and structured.
+
+Rules:
+
+```text
+Field structure: label, input, hint
+Field gap: 16px
+Label to input gap: 6-8px
+Do not create dense spreadsheet-like forms
+Avoid too many columns unless the data truly requires it
+```
+
+Input style:
+
+```text
+Use dark translucent fills in dark mode
+Use soft border substitutes
+Focus state uses the primary accent and soft focus glow
+```
+
+Toggle style:
+
+```text
+On: primary accent with glow
+Off: dark neutral surface such as #1E293B
+```
+
+Tags and pills:
+
+```text
+Rounded capsule shape
+Tinted background based on semantic or project color
+Readable brighter foreground
+```
+
+## Tables
+
+Tables should feel productive, airy, and controlled.
+
+Rules:
+
+```text
+Right-align durations and money
+Use monospaced digits for numbers
+Show empty states
+Support sorting where useful
+Support row expansion for reports and calendar
+Avoid overloaded rows
+Keep row height around 48-56px where possible
+Left side: identity
+Center: core information
+Right side: actions
+Hover uses a soft translucent highlight
+```
+
+Do not turn rows into visually noisy control panels.
+
+## Charts
+
+Use Swift Charts, but style them to match the system rather than default chart appearance.
+
+Composition rules:
+
+```text
+One chart = one metric
+Do not mix income and time in the same chart unless explicitly justified
+Use grouped placement such as one large chart plus a small chart row, or multiple balanced cards
+Typical chart card height: 160-220px
+Title sits top-left
+Legend sits right or bottom when needed
+Tooltip is required when practical
+```
+
+Visual rules:
+
+```text
+Lines should be brighter than surrounding UI
+Prefer smooth visual flow over harsh angular shapes
+At most 1-2 lines per line chart unless necessary
+Grid lines are very subtle
+Tooltip uses a dark translucent surface with a subtle highlight edge
+Donut charts use saturated segments and a darker center
+```
+
+Use accent glow on highlighted data in dark mode.
+
+## Navigation and focus states
+
+Interactive state rules:
+
+```text
+Active = gradient + glow
+Selected = tinted background or subtle outline + accent emphasis
+Hover = light translucent lift
+Focused inputs and controls = visible accent ring or glow
+```
+
+Navigation, selected calendar days, and focused table rows should all follow the same visual logic.
 
 ## Materials
 
-Use native macOS materials where possible.
+Use native macOS materials where possible, but style them through the system tokens instead of relying on default appearance.
 
-Create reusable card/background components instead of repeating modifiers.
+Create reusable surface components instead of repeating modifiers.
 
-Example:
+Example intent:
 
 ```swift
 struct GlassCard<Content: View>: View {
@@ -798,52 +1159,28 @@ struct GlassCard<Content: View>: View {
         content
             .padding(AppSpacing.lg)
             .background(.regularMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppRadii.large, style: .continuous))
     }
 }
 ```
 
-## Buttons
+Any production implementation should also add the repository's shadow, tint, and highlight treatment rather than stopping at plain material.
 
-Create reusable button styles:
+## Empty states
 
-```text
-Primary action
-Secondary action
-Destructive action
-Timer start
-Timer stop
-Small toolbar button
-```
-
-Timer start/stop buttons must be visually obvious and easy to click.
-
-## Tables
-
-Tables should be clean and dense enough for productivity use.
+Every major screen needs a useful empty state with proper hierarchy and breathing room.
 
 Rules:
 
 ```text
-Right-align durations and money
-Use monospaced digits for numbers
-Show empty states
-Support sorting where useful
-Support row expansion for reports and calendar
-Avoid horizontal clutter
+Short title
+Helpful explanation
+One clear primary action
+Optional supporting secondary action
+Enough empty space to feel intentional, not broken
 ```
 
-## Empty states
-
-Every major screen needs a useful empty state.
-
-Examples:
-
-```text
-No projects yet — Create your first project
-No sessions today — Start a timer
-No report data — Change the selected period
-```
+Examples should also be written in Russian in the app UI.
 
 ---
 
@@ -1227,7 +1564,7 @@ Build in this order:
 11. MenuBarExtra timer.
 12. Long timer reminders.
 13. iCloud sync.
-14. Liquid Glass polish and advanced charts.
+14. Glass gradient polish and advanced charts.
 
 Do not start with visual polish before the core tracking and calculation logic is reliable.
 
@@ -1246,6 +1583,7 @@ It handles empty and error states
 It does not break existing data
 It has tests for non-trivial calculations
 It feels native on macOS
+It follows the repository's strict Glass SaaS gradient design language
 ```
 
 ---
@@ -1258,6 +1596,7 @@ When in doubt, optimize for:
 Data safety
 Correct income calculation
 Native macOS experience
+Strict Glass SaaS gradient visual consistency
 Readable senior-level Swift code
 Reusable feature architecture
 Simple, testable business logic

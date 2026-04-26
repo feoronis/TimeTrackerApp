@@ -13,6 +13,23 @@ enum AppSection: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .dashboard:
+            return "Панель"
+        case .calendar:
+            return "Календарь"
+        case .reports:
+            return "Отчёты"
+        case .projects:
+            return "Проекты"
+        case .sessions:
+            return "Сессии"
+        case .settings:
+            return "Настройки"
+        }
+    }
+
+    var iconName: String {
+        switch self {
+        case .dashboard:
             return "Dashboard"
         case .calendar:
             return "Calendar"
@@ -26,23 +43,6 @@ enum AppSection: String, CaseIterable, Identifiable {
             return "Settings"
         }
     }
-
-    var systemImage: String {
-        switch self {
-        case .dashboard:
-            return "square.grid.2x2"
-        case .calendar:
-            return "calendar"
-        case .reports:
-            return "chart.bar"
-        case .projects:
-            return "folder"
-        case .sessions:
-            return "clock"
-        case .settings:
-            return "gearshape"
-        }
-    }
 }
 
 struct AppRouterView: View {
@@ -52,11 +52,11 @@ struct AppRouterView: View {
     var body: some View {
         HStack(spacing: 0) {
             AppSidebar(selection: $selection)
-                .frame(width: 280)
+                .frame(width: 244)
 
             Divider()
 
-            Group {
+            ZStack {
                 switch selection {
                 case .dashboard:
                     DashboardView {
@@ -74,10 +74,13 @@ struct AppRouterView: View {
                     SettingsView()
                 }
             }
+            .id(selection)
+            .transition(.opacity)
+            .animation(.easeInOut(duration: 0.2), value: selection)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(AppColors.windowBackground.ignoresSafeArea())
+            .background(AppColors.windowGradient.ignoresSafeArea())
         }
-        .background(AppColors.sidebarBackground.ignoresSafeArea())
+        .background(AppColors.windowGradient.ignoresSafeArea())
         .task {
             appEnvironment.bootstrap()
         }
@@ -90,28 +93,18 @@ private struct AppSidebar: View {
     var body: some View {
         VStack(alignment: .leading, spacing: AppSpacing.xl) {
             HStack(spacing: AppSpacing.md) {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color(red: 0.32, green: 0.58, blue: 0.98),
-                                Color(red: 0.21, green: 0.82, blue: 0.75)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 42, height: 42)
-                    .overlay {
-                        Image(systemName: "timer")
-                            .font(.headline.weight(.bold))
-                            .foregroundStyle(.white)
-                    }
+                AppBundleIcon(
+                    name: "logo",
+                    size: 42,
+                    color: AppColors.primaryText,
+                    rendersAsTemplate: false
+                )
 
                 Text("TimeTrack")
-                    .font(.title3.weight(.semibold))
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(AppColors.primaryText)
             }
-            .padding(.top, AppSpacing.lg)
+            .padding(.top, 4)
 
             VStack(spacing: AppSpacing.sm) {
                 ForEach(AppSection.allCases) { section in
@@ -124,12 +117,15 @@ private struct AppSidebar: View {
             }
 
             Spacer()
-
-            SidebarProfileCard()
         }
-        .padding(.horizontal, AppSpacing.lg)
-        .padding(.vertical, AppSpacing.xl)
+        .padding(20)
         .frame(maxHeight: .infinity, alignment: .top)
+        .background(AppColors.sidebarGradient)
+        .overlay(alignment: .trailing) {
+            Rectangle()
+                .fill(AppColors.separator.opacity(AppearancePreferences.isDarkMode ? 1 : 0.7))
+                .frame(width: 1)
+        }
     }
 }
 
@@ -138,80 +134,56 @@ private struct SidebarItem: View {
     let isSelected: Bool
     let action: () -> Void
     @State private var isHovered = false
+    private let itemHeight: CGFloat = 52
+    private let selectionAnimation = Animation.easeInOut(duration: 0.18)
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            withAnimation(selectionAnimation) {
+                action()
+            }
+        } label: {
             HStack(spacing: AppSpacing.md) {
-                Image(systemName: section.systemImage)
-                    .frame(width: 18)
+                AppBundleIcon(
+                    name: section.iconName,
+                    size: 22,
+                    color: itemForegroundColor
+                )
+                .frame(width: 22)
 
                 Text(section.title)
-                    .font(.headline)
+                    .font(.system(size: 15, weight: .regular))
 
                 Spacer()
             }
-            .foregroundStyle(isSelected ? Color.primary : Color.secondary)
-            .padding(.horizontal, AppSpacing.md)
-            .padding(.vertical, 14)
+            .foregroundStyle(itemForegroundColor)
+            .padding(.horizontal, 14)
+            .frame(maxWidth: .infinity)
+            .frame(height: itemHeight)
             .background(background)
             .overlay {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .strokeBorder(AppColors.glassHighlight.opacity(isSelected ? 0.26 : 0), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(Color.white.opacity(isSelected ? 0.22 : 0), lineWidth: 1)
             }
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .buttonStyle(.plain)
+        .animation(.easeInOut(duration: 0.18), value: isHovered)
         .onHover { hovering in
             isHovered = hovering
         }
     }
 
+    private var itemForegroundColor: Color {
+        isSelected ? AppColors.inverseText : AppColors.primaryText
+    }
+
     private var background: some ShapeStyle {
         if isSelected {
-            return AnyShapeStyle(
-                LinearGradient(
-                    colors: [AppColors.sidebarSelectionTop, AppColors.sidebarSelectionBottom],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
+            return AnyShapeStyle(AppColors.primaryActionFill)
         }
 
         return AnyShapeStyle(isHovered ? AppColors.sidebarHover : Color.clear)
-    }
-}
-
-private struct SidebarProfileCard: View {
-    var body: some View {
-        HStack(spacing: AppSpacing.md) {
-            Circle()
-                .fill(Color(red: 0.36, green: 0.63, blue: 0.98))
-                .frame(width: 42, height: 42)
-                .overlay {
-                    Text("А")
-                        .font(.headline.weight(.semibold))
-                        .foregroundStyle(.white)
-                }
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Алексей")
-                    .font(.headline)
-
-                Text("Pro Plan")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            Image(systemName: "ellipsis")
-                .foregroundStyle(.secondary)
-        }
-        .padding(AppSpacing.md)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(AppColors.glassHighlight.opacity(0.18), lineWidth: 1)
-        }
     }
 }

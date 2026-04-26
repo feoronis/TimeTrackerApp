@@ -9,21 +9,6 @@ enum AppFormatters {
         return calendar
     }()
 
-    private static let dateTimeFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = russianLocale
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-        return formatter
-    }()
-
-    private static let timeFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = russianLocale
-        formatter.timeStyle = .short
-        return formatter
-    }()
-
     private static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = russianLocale
@@ -53,10 +38,17 @@ enum AppFormatters {
         return formatter
     }()
 
-    private static let statusTimeFormatter: DateFormatter = {
+    private static let reportShortDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = russianLocale
-        formatter.setLocalizedDateFormatFromTemplate("HH:mm")
+        formatter.setLocalizedDateFormatFromTemplate("d MMM yyyy")
+        return formatter
+    }()
+
+    private static let editableDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = russianLocale
+        formatter.dateFormat = "dd.MM.yyyy"
         return formatter
     }()
 
@@ -64,16 +56,21 @@ enum AppFormatters {
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
         formatter.locale = russianLocale
-        formatter.maximumFractionDigits = 2
+        formatter.minimumFractionDigits = 0
+        formatter.maximumFractionDigits = 0
         return formatter
     }()
 
     static func dateTimeText(_ date: Date) -> String {
-        dateTimeFormatter.string(from: date)
+        let formatter = DateFormatter()
+        formatter.locale = russianLocale
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        return "\(formatter.string(from: date)) \(statusTimeText(date))"
     }
 
     static func timeText(_ date: Date) -> String {
-        timeFormatter.string(from: date)
+        statusTimeText(date)
     }
 
     static func dateText(_ date: Date) -> String {
@@ -93,7 +90,26 @@ enum AppFormatters {
     }
 
     static func statusTimeText(_ date: Date) -> String {
-        statusTimeFormatter.string(from: date)
+        let formatter = DateFormatter()
+        formatter.locale = russianLocale
+        if AppearancePreferences.preferredTimeFormat == "12h" {
+            formatter.setLocalizedDateFormatFromTemplate("h:mm a")
+        } else {
+            formatter.setLocalizedDateFormatFromTemplate("HH:mm")
+        }
+        return formatter.string(from: date)
+    }
+
+    static func reportShortDateText(_ date: Date) -> String {
+        reportShortDateFormatter.string(from: date)
+    }
+
+    static func editableDateText(_ date: Date) -> String {
+        editableDateFormatter.string(from: date)
+    }
+
+    static func parseEditableDate(_ text: String) -> Date? {
+        editableDateFormatter.date(from: text.trimmingCharacters(in: .whitespacesAndNewlines))
     }
 
     static func durationText(from duration: TimeInterval) -> String {
@@ -142,12 +158,15 @@ enum AppFormatters {
     }
 
     static func calendarWeekdaySymbols() -> [String] {
-        let symbols = russianCalendar.shortStandaloneWeekdaySymbols
+        var calendar = russianCalendar
+        calendar.firstWeekday = AppearancePreferences.preferredFirstDayOfWeek
+        let symbols = calendar.shortStandaloneWeekdaySymbols
         guard symbols.count == 7 else {
             return ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
         }
 
-        let reordered = Array(symbols[1...6]) + [symbols[0]]
+        let offset = max(0, min(6, calendar.firstWeekday - 1))
+        let reordered = Array(symbols[offset...]) + Array(symbols[..<offset])
         return reordered
             .map { $0.capitalized(with: russianLocale) }
     }

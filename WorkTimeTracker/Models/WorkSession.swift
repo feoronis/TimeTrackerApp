@@ -12,6 +12,9 @@ final class WorkSession {
     private var tagsStorage: String
     var customHourlyRate: Decimal?
     var resolvedHourlyRateSnapshot: Decimal
+    var fixedIncomeAmount: Decimal?
+    var pausedAt: Date?
+    var accumulatedPausedSeconds: TimeInterval
     var createdAt: Date
     var updatedAt: Date
 
@@ -25,6 +28,9 @@ final class WorkSession {
         tags: [String] = [],
         customHourlyRate: Decimal? = nil,
         resolvedHourlyRateSnapshot: Decimal = .zero,
+        fixedIncomeAmount: Decimal? = nil,
+        pausedAt: Date? = nil,
+        accumulatedPausedSeconds: TimeInterval = 0,
         createdAt: Date = .now,
         updatedAt: Date = .now
     ) {
@@ -37,6 +43,9 @@ final class WorkSession {
         self.tagsStorage = Self.serializeTags(tags)
         self.customHourlyRate = customHourlyRate
         self.resolvedHourlyRateSnapshot = resolvedHourlyRateSnapshot
+        self.fixedIncomeAmount = fixedIncomeAmount
+        self.pausedAt = pausedAt
+        self.accumulatedPausedSeconds = accumulatedPausedSeconds
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
@@ -61,5 +70,13 @@ final class WorkSession {
         rawValue
             .split(separator: "\n")
             .map { String($0) }
+    }
+
+    var isPaused: Bool {
+        pausedAt != nil && endTime == nil
+    }
+
+    var usesFixedIncomeAmount: Bool {
+        fixedIncomeAmount != nil
     }
 }

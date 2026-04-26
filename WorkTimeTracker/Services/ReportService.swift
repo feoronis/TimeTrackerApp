@@ -75,6 +75,7 @@ struct ProjectReportRow: Identifiable {
     let id: String
     let projectID: UUID?
     let projectName: String
+    let projectColorHex: String?
     let totalDurationSeconds: TimeInterval
     let sessionCount: Int
     let averageInformationalRate: Decimal
@@ -82,7 +83,12 @@ struct ProjectReportRow: Identifiable {
     let sessions: [SessionReportRow]
 }
 
-struct DailyChartPoint: Identifiable {
+enum ReportChartGranularity {
+    case hour
+    case day
+}
+
+struct TimeSeriesChartPoint: Identifiable {
     let date: Date
     let totalDurationSeconds: TimeInterval
     let totalIncome: Decimal
@@ -124,11 +130,12 @@ struct PeriodReport {
     let filter: ReportFilter
     let summary: PeriodReportSummary
     let projectRows: [ProjectReportRow]
-    let incomeByDay: [DailyChartPoint]
-    let timeByDay: [DailyChartPoint]
+    let incomeByDate: [TimeSeriesChartPoint]
+    let timeByDate: [TimeSeriesChartPoint]
     let timeByProject: [ProjectChartPoint]
     let incomeByProject: [ProjectChartPoint]
     let availableTags: [String]
+    let chartGranularity: ReportChartGranularity
 }
 
 struct ReportService {
@@ -200,7 +207,13 @@ struct ReportService {
             calendar: calendar
         )
 
-        let dailyPoints = buildDailyPoints(from: filteredSessions, calendar: calendar)
+        let chartGranularity = chartGranularity(for: filter, interval: interval, calendar: calendar)
+        let timeSeriesPoints = buildTimeSeriesPoints(
+            from: filteredSessions,
+            interval: interval,
+            granularity: chartGranularity,
+            calendar: calendar
+        )
         let projectPoints = buildProjectPoints(from: projectRows)
         let availableTags = Array(Set(sessions.flatMap(\.tags))).sorted()
 
@@ -208,11 +221,12 @@ struct ReportService {
             filter: filter,
             summary: summary,
             projectRows: projectRows,
-            incomeByDay: dailyPoints,
-            timeByDay: dailyPoints,
+            incomeByDate: timeSeriesPoints,
+            timeByDate: timeSeriesPoints,
             timeByProject: projectPoints,
             incomeByProject: projectPoints,
-            availableTags: availableTags
+            availableTags: availableTags,
+            chartGranularity: chartGranularity
         )
     }
 
@@ -314,6 +328,7 @@ struct ReportService {
                     id: key.id,
                     projectID: key.projectID,
                     projectName: key.projectName,
+                    projectColorHex: groupedSessions.first?.project?.colorHex,
                     totalDurationSeconds: totalDuration,
                     sessionCount: reportRows.count,
                     averageInformationalRate: averageRate,
@@ -330,24 +345,82 @@ struct ReportService {
             }
     }
 
-    private func buildDailyPoints(
+    private func buildTimeSeriesPoints(
         from sessions: [WorkSession],
+        interval: DateInterval,
+        granularity: ReportChartGranularity,
         calendar: Calendar
-    ) -> [DailyChartPoint] {
+    ) -> [TimeSeriesChartPoint] {
+        let component: Calendar.Component = granularity == .hour ? .hour : .day
         let groupedSessions = Dictionary(
             grouping: sessions,
-            by: { calendar.startOfDay(for: $0.startTime) }
+            by: { dateBucketStart(for: $0.startTime, granularity: granularity, calendar: calendar) }
         )
+        let visibleEnd = visibleIntervalEnd(for: interval, granularity: granularity, calendar: calendar)
 
-        return groupedSessions
-            .map { date, daySessions in
-                DailyChartPoint(
-                    date: date,
-                    totalDurationSeconds: daySessions.reduce(0) { $0 + $1.durationSeconds },
-                    totalIncome: daySessions.reduce(Decimal.zero) { $0 + sessionCalculator.sessionIncome($1) }
+        var points: [TimeSeriesChartPoint] = []
+        var currentDate = dateBucketStart(for: interval.start, granularity: granularity, calendar: calendar)
+
+        while currentDate < visibleEnd {
+            let bucketSessions = groupedSessions[currentDate] ?? []
+            points.append(
+                TimeSeriesChartPoint(
+                    date: currentDate,
+                    totalDurationSeconds: bucketSessions.reduce(0) { $0 + $1.durationSeconds },
+                    totalIncome: bucketSessions.reduce(Decimal.zero) { $0 + sessionCalculator.sessionIncome($1) }
                 )
-            }
-            .sorted { $0.date < $1.date }
+            )
+
+            currentDate = calendar.date(byAdding: component, value: 1, to: currentDate) ?? visibleEnd
+        }
+
+        return points
+    }
+
+    private func chartGranularity(
+        for filter: ReportFilter,
+        interval: DateInterval,
+        calendar: Calendar
+    ) -> ReportChartGranularity {
+        if filter.period == .today {
+            return .hour
+        }
+
+        let daySpan = calendar.dateComponents([.day], from: interval.start, to: interval.end).day ?? 0
+        return daySpan <= 1 ? .hour : .day
+    }
+
+    private func dateBucketStart(
+        for date: Date,
+        granularity: ReportChartGranularity,
+        calendar: Calendar
+    ) -> Date {
+        switch granularity {
+        case .hour:
+            let components = calendar.dateComponents([.year, .month, .day, .hour], from: date)
+            return calendar.date(from: components) ?? date
+        case .day:
+            return calendar.startOfDay(for: date)
+        }
+    }
+
+    private func visibleIntervalEnd(
+        for interval: DateInterval,
+        granularity: ReportChartGranularity,
+        calendar: Calendar
+    ) -> Date {
+        guard interval.contains(.now) else {
+            return interval.end
+        }
+
+        switch granularity {
+        case .hour:
+            let currentBucket = dateBucketStart(for: .now, granularity: .hour, calendar: calendar)
+            return calendar.date(byAdding: .hour, value: 1, to: currentBucket) ?? interval.end
+        case .day:
+            let currentBucket = calendar.startOfDay(for: .now)
+            return calendar.date(byAdding: .day, value: 1, to: currentBucket) ?? interval.end
+        }
     }
 
     private func buildProjectPoints(from projectRows: [ProjectReportRow]) -> [ProjectChartPoint] {

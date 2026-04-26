@@ -10,18 +10,12 @@ final class SessionRepository {
     }
 
     func fetchAll() throws -> [WorkSession] {
-        let descriptor = FetchDescriptor<WorkSession>(
-            sortBy: [SortDescriptor<WorkSession>(\.startTime, order: .reverse)]
-        )
-        return try modelContext.fetch(descriptor)
+        let descriptor = FetchDescriptor<WorkSession>()
+        return sortBySessionEndTime(try modelContext.fetch(descriptor))
     }
 
     func fetchRecent(limit: Int) throws -> [WorkSession] {
-        var descriptor = FetchDescriptor<WorkSession>(
-            sortBy: [SortDescriptor<WorkSession>(\.startTime, order: .reverse)]
-        )
-        descriptor.fetchLimit = limit
-        return try modelContext.fetch(descriptor)
+        Array(try fetchAll().prefix(limit))
     }
 
     func fetchActiveSessions() throws -> [WorkSession] {
@@ -47,12 +41,43 @@ final class SessionRepository {
         Dictionary(uniqueKeysWithValues: try fetchAll().map { ($0.id, $0) })
     }
 
+    func fetchSessions(projectID: UUID) throws -> [WorkSession] {
+        let descriptor = FetchDescriptor<WorkSession>(
+            predicate: #Predicate<WorkSession> { session in
+                session.project?.id == projectID
+            }
+        )
+
+        return try modelContext.fetch(descriptor)
+    }
+
     func delete(_ session: WorkSession) throws {
         modelContext.delete(session)
         try modelContext.save()
     }
 
+    func delete(_ sessions: [WorkSession]) throws {
+        for session in sessions {
+            modelContext.delete(session)
+        }
+
+        try modelContext.save()
+    }
+
     func save() throws {
         try modelContext.save()
+    }
+
+    private func sortBySessionEndTime(_ sessions: [WorkSession]) -> [WorkSession] {
+        sessions.sorted { lhs, rhs in
+            let lhsDate = lhs.endTime ?? lhs.startTime
+            let rhsDate = rhs.endTime ?? rhs.startTime
+
+            if lhsDate == rhsDate {
+                return lhs.startTime > rhs.startTime
+            }
+
+            return lhsDate > rhsDate
+        }
     }
 }

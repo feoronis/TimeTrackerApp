@@ -52,4 +52,9 @@ final class ProjectRepository {
         project.updatedAt = .now
         try modelContext.save()
     }
+
+    func delete(_ project: Project) throws {
+        modelContext.delete(project)
+        try modelContext.save()
+    }
 }

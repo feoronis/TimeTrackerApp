@@ -34,17 +34,20 @@ struct ImportService {
     private let sessionRepository: SessionRepository
     private let settingsRepository: SettingsRepository
     private let dayNoteRepository: DayNoteRepository
+    private let tagRepository: TagRepository
 
     init(
         projectRepository: ProjectRepository,
         sessionRepository: SessionRepository,
         settingsRepository: SettingsRepository,
-        dayNoteRepository: DayNoteRepository
+        dayNoteRepository: DayNoteRepository,
+        tagRepository: TagRepository
     ) {
         self.projectRepository = projectRepository
         self.sessionRepository = sessionRepository
         self.settingsRepository = settingsRepository
         self.dayNoteRepository = dayNoteRepository
+        self.tagRepository = tagRepository
     }
 
     func importJSON() throws -> ImportSummary {
@@ -63,6 +66,9 @@ struct ImportService {
         let existingDayNotes = try dayNoteRepository.fetchAll()
         let existingDayNotesByID = Dictionary(uniqueKeysWithValues: existingDayNotes.map { ($0.id, $0) })
         var existingDayNoteDates = Set(existingDayNotes.map { Calendar.current.startOfDay(for: $0.date) })
+        let existingTags = try tagRepository.fetchAllByID()
+        var tagsByID = existingTags
+        var normalizedTagNames = Set(existingTags.values.map { TagRepository.normalizedName(for: $0.name) })
         var allProjectsByID = existingProjects
         let existingActiveSession = try sessionRepository.fetchActiveSession()
 
@@ -76,6 +82,8 @@ struct ImportService {
         var skippedSessions = 0
         var importedDayNotes = 0
         var skippedDayNotes = 0
+        var importedTags = 0
+        var skippedTags = 0
         var settingsMerged = false
 
         for projectSnapshot in snapshot.projects {
@@ -98,6 +106,27 @@ struct ImportService {
             try projectRepository.insert(project)
             allProjectsByID[project.id] = project
             importedProjects += 1
+        }
+
+        for tagSnapshot in snapshot.tags {
+            let normalizedName = TagRepository.normalizedName(for: tagSnapshot.name)
+
+            guard tagsByID[tagSnapshot.id] == nil,
+                  normalizedTagNames.contains(normalizedName) == false else {
+                skippedTags += 1
+                continue
+            }
+
+            let tag = Tag(
+                id: tagSnapshot.id,
+                name: tagSnapshot.name,
+                createdAt: tagSnapshot.createdAt,
+                updatedAt: tagSnapshot.updatedAt
+            )
+            try tagRepository.insert(tag)
+            tagsByID[tag.id] = tag
+            normalizedTagNames.insert(normalizedName)
+            importedTags += 1
         }
 
         for dayNoteSnapshot in snapshot.dayNotes {
@@ -137,12 +166,19 @@ struct ImportService {
                 tags: sessionSnapshot.tags,
                 customHourlyRate: sessionSnapshot.customHourlyRate,
                 resolvedHourlyRateSnapshot: sessionSnapshot.resolvedHourlyRateSnapshot,
+                fixedIncomeAmount: sessionSnapshot.fixedIncomeAmount,
+                pausedAt: sessionSnapshot.pausedAt,
+                accumulatedPausedSeconds: sessionSnapshot.accumulatedPausedSeconds,
                 createdAt: sessionSnapshot.createdAt,
                 updatedAt: sessionSnapshot.updatedAt
             )
             try sessionRepository.insert(session)
             importedSessions += 1
         }
+
+        try tagRepository.upsertMissingTags(
+            named: snapshot.tags.map(\.name) + snapshot.sessions.flatMap(\.tags)
+        )
 
         if let importedSettings = snapshot.settings {
             let currentSettings = try settingsRepository.fetchOrCreateSettings()
@@ -155,8 +191,9 @@ struct ImportService {
             currentSettings.longTimerReminderMinutes = importedSettings.longTimerReminderMinutes
             currentSettings.iCloudSyncEnabled = importedSettings.iCloudSyncEnabled
             currentSettings.autoBackupEnabled = importedSettings.autoBackupEnabled
+            currentSettings.autoBackupDirectoryPath = importedSettings.autoBackupDirectoryPath
+            currentSettings.autoBackupDirectoryBookmark = nil
             currentSettings.themeMode = importedSettings.themeMode
-            currentSettings.accentColorName = importedSettings.accentColorName
             currentSettings.liquidGlassEnabled = importedSettings.liquidGlassEnabled
             currentSettings.updatedAt = .now
             try settingsRepository.save()
@@ -170,6 +207,8 @@ struct ImportService {
             skippedSessions: skippedSessions,
             importedDayNotes: importedDayNotes,
             skippedDayNotes: skippedDayNotes,
+            importedTags: importedTags,
+            skippedTags: skippedTags,
             settingsMerged: settingsMerged
         )
     }

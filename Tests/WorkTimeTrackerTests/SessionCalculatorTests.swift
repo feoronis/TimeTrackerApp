@@ -40,6 +40,19 @@ struct SessionCalculatorTests {
     }
 
     @Test
+    func sessionIncomeUsesFixedAmountWhenProvided() {
+        let session = WorkSession(
+            startTime: Date(timeIntervalSince1970: 0),
+            endTime: Date(timeIntervalSince1970: 3600),
+            durationSeconds: 3600,
+            resolvedHourlyRateSnapshot: Decimal(125),
+            fixedIncomeAmount: Decimal(500)
+        )
+
+        #expect(calculator.sessionIncome(session) == Decimal(500))
+    }
+
+    @Test
     func completedSessionValuesPreserveHistoricalSnapshot() {
         let projectRateAtCreation = Decimal(150)
         let values = calculator.calculateCompletedSessionValues(
@@ -55,5 +68,21 @@ struct SessionCalculatorTests {
         #expect(values.resolvedHourlyRateSnapshot == Decimal(150))
         #expect(values.income == Decimal(300))
         #expect(changedProjectRate != values.resolvedHourlyRateSnapshot)
+    }
+
+    @Test
+    func completedSessionValuesApplyRoundingRules() {
+        let values = calculator.calculateCompletedSessionValues(
+            start: Date(timeIntervalSince1970: 0),
+            end: Date(timeIntervalSince1970: 3_900),
+            sessionCustomRate: nil,
+            projectRate: Decimal(120),
+            defaultRate: Decimal(100),
+            roundingMode: .up,
+            roundingMinutes: 30
+        )
+
+        #expect(values.durationSeconds == 5_400)
+        #expect(values.income == Decimal(180))
     }
 }

@@ -4,59 +4,62 @@ struct ReportPeriodPicker: View {
     @Bindable var viewModel: ReportsViewModel
 
     var body: some View {
-        GlassCard {
-            VStack(alignment: .leading, spacing: AppSpacing.lg) {
-                Text("Период и фильтры")
-                    .font(.headline)
-
-                HStack(alignment: .bottom, spacing: AppSpacing.lg) {
-                    Picker("Период", selection: $viewModel.filter.period) {
-                        ForEach(ReportPeriod.allCases) { period in
-                            Text(period.title).tag(period)
+        HStack(spacing: AppSpacing.lg) {
+            HStack(spacing: 10) {
+                ForEach(viewModel.periodButtons) { option in
+                    Button(option.title) {
+                        withAnimation(.snappy(duration: 0.34, extraBounce: 0.02)) {
+                            viewModel.setPeriod(option.period)
                         }
                     }
-                    .frame(maxWidth: 240)
-
-                    Picker("Проект", selection: $viewModel.filter.projectID) {
-                        Text("Все проекты").tag(Optional<UUID>.none)
-
-                        ForEach(viewModel.projects, id: \.id) { project in
-                            Text(project.name).tag(Optional(project.id))
-                        }
-                    }
-                    .frame(maxWidth: 240)
-
-                    Picker("Тег", selection: $viewModel.filter.tag) {
-                        Text("Все теги").tag(Optional<String>.none)
-
-                        ForEach(viewModel.report?.availableTags ?? [], id: \.self) { tag in
-                            Text(tag).tag(Optional(tag))
-                        }
-                    }
-                    .frame(maxWidth: 220)
+                    .buttonStyle(ReportsFilterButtonStyle(isActive: viewModel.filter.period == option.period))
                 }
+            }
 
+            Spacer()
+
+            DateRangeField(
+                startDate: $viewModel.filter.customStartDate,
+                endDate: $viewModel.filter.customEndDate
+            )
+            .onChange(of: viewModel.filter.customStartDate, initial: false) {
                 if viewModel.filter.period == .custom {
-                    HStack(spacing: AppSpacing.lg) {
-                        DatePicker(
-                            "С",
-                            selection: $viewModel.filter.customStartDate,
-                            displayedComponents: [.date]
-                        )
-
-                        DatePicker(
-                            "По",
-                            selection: $viewModel.filter.customEndDate,
-                            displayedComponents: [.date]
-                        )
-                    }
-                }
-
-                Button("Применить фильтры") {
                     viewModel.applyFilters()
                 }
-                .buttonStyle(GlassPrimaryButtonStyle())
+            }
+            .onChange(of: viewModel.filter.customEndDate, initial: false) {
+                if viewModel.filter.period == .custom {
+                    viewModel.applyFilters()
+                }
             }
         }
+    }
+}
+
+private struct ReportsFilterButtonStyle: ButtonStyle {
+    let isActive: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(isActive ? AppColors.inverseText : AppColors.secondaryText)
+            .padding(.horizontal, 16)
+            .frame(height: 36)
+            .background(background(configuration.isPressed))
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(isActive ? Color.white.opacity(0.18) : AppColors.fieldBorder, lineWidth: 1)
+            }
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .animation(.easeOut(duration: 0.14), value: configuration.isPressed)
+    }
+
+    private func background(_ isPressed: Bool) -> some ShapeStyle {
+        if isActive {
+            return AnyShapeStyle(AppColors.primaryActionFill.opacity(isPressed ? 0.86 : 1))
+        }
+
+        return AnyShapeStyle(AppColors.fieldFill)
     }
 }

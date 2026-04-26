@@ -51,28 +51,6 @@ enum ThemeModeOption: String, CaseIterable, Identifiable {
     }
 }
 
-enum AccentColorOption: String, CaseIterable, Identifiable {
-    case blue
-    case green
-    case orange
-    case pink
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .blue:
-            return "Синий"
-        case .green:
-            return "Зеленый"
-        case .orange:
-            return "Оранжевый"
-        case .pink:
-            return "Розовый"
-        }
-    }
-}
-
 enum RoundingModeOption: String, CaseIterable, Identifiable {
     case none
     case up
