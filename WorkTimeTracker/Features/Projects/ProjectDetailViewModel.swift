@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Observation
 
@@ -29,6 +30,7 @@ enum ProjectDetailTab: String, CaseIterable, Identifiable {
 struct ProjectPasswordGroupSection: Identifiable, Equatable {
     let id: String
     let title: String
+    let groupDescription: String?
     let items: [ProjectPasswordItem]
 }
 
@@ -53,12 +55,15 @@ final class ProjectDetailViewModel {
     var isDeleteConfirmationPresented = false
     var isPasswordDeleteConfirmationPresented = false
     var isPasswordEditorPresented = false
+    var passwordEditorErrorMessage: String?
     var passwordSearchText = ""
     var selectedGroupFilter: String?
     var passwordEditorDraft = ProjectPasswordDraft()
     var editingPasswordID: UUID?
     var revealedPasswordIDs = Set<UUID>()
     var passwordPendingDeletion: ProjectPasswordItem?
+    var passwordCopyToastMessage: String?
+    private var copyToastHideTask: Task<Void, Never>?
 
     init(appEnvironment: AppEnvironment, project: Project?, selectedTab: ProjectDetailTab = .general) {
         self.appEnvironment = appEnvironment
@@ -103,6 +108,33 @@ final class ProjectDetailViewModel {
         .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
     }
 
+    var groupDescriptionsByName: [String: String] {
+        var descriptions: [String: (updatedAt: Date, text: String)] = [:]
+
+        for item in passwordItems {
+            let groupName = item.groupName.trimmingCharacters(in: .whitespacesAndNewlines)
+            let description = item.itemDescription?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+
+            guard
+                groupName.isEmpty == false,
+                groupName != "Без группы",
+                let description
+            else {
+                continue
+            }
+
+            if let current = descriptions[groupName] {
+                if item.updatedAt > current.updatedAt {
+                    descriptions[groupName] = (item.updatedAt, description)
+                }
+            } else {
+                descriptions[groupName] = (item.updatedAt, description)
+            }
+        }
+
+        return descriptions.mapValues(\.text)
+    }
+
     var groupedPasswords: [ProjectPasswordGroupSection] {
         let trimmedSearch = passwordSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
         let filteredItems = passwordItems.filter { item in
@@ -127,6 +159,10 @@ final class ProjectDetailViewModel {
                 ProjectPasswordGroupSection(
                     id: key,
                     title: key,
+                    groupDescription: value
+                        .sorted(by: { $0.updatedAt > $1.updatedAt })
+                        .compactMap { $0.itemDescription?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty }
+                        .first,
                     items: value.sorted { lhs, rhs in
                         if lhs.updatedAt != rhs.updatedAt {
                             return lhs.updatedAt > rhs.updatedAt
@@ -244,12 +280,14 @@ final class ProjectDetailViewModel {
 
         passwordEditorDraft = ProjectPasswordDraft()
         editingPasswordID = nil
+        passwordEditorErrorMessage = nil
         isPasswordEditorPresented = true
     }
 
     func presentEditPasswordEditor(_ item: ProjectPasswordItem) {
         passwordEditorDraft = ProjectPasswordDraft(item: item)
         editingPasswordID = item.id
+        passwordEditorErrorMessage = nil
         isPasswordEditorPresented = true
     }
 
@@ -277,7 +315,7 @@ final class ProjectDetailViewModel {
 
     func savePassword() {
         guard let projectID else {
-            errorMessage = "Сначала сохраните проект, затем добавьте пароли."
+            passwordEditorErrorMessage = "Сначала сохраните проект, затем добавьте пароли."
             return
         }
 
@@ -286,12 +324,12 @@ final class ProjectDetailViewModel {
         let trimmedGroupName = passwordEditorDraft.groupName.trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard trimmedTitle.isEmpty == false else {
-            errorMessage = "Название записи обязательно."
+            passwordEditorErrorMessage = "Название записи обязательно."
             return
         }
 
         guard trimmedPassword.isEmpty == false else {
-            errorMessage = "Пароль обязателен."
+            passwordEditorErrorMessage = "Пароль обязателен."
             return
         }
 
@@ -311,13 +349,15 @@ final class ProjectDetailViewModel {
                 updatedAt: .now
             )
             try passwordService.upsert(item)
+            try updateGroupDescription(basedOn: item)
             isPasswordEditorPresented = false
             editingPasswordID = nil
+            passwordEditorErrorMessage = nil
             try reloadPasswords()
             successMessage = current == nil ? "Пароль сохранён." : "Запись пароля обновлена."
             errorMessage = nil
         } catch {
-            errorMessage = error.localizedDescription
+            passwordEditorErrorMessage = error.localizedDescription
         }
     }
 
@@ -344,6 +384,48 @@ final class ProjectDetailViewModel {
         }
     }
 
+    func copyPasswordToPasteboard(for itemID: UUID) {
+        guard let item = passwordItems.first(where: { $0.id == itemID }) else {
+            errorMessage = "Запись пароля не найдена."
+            return
+        }
+
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+
+        guard pasteboard.setString(item.password, forType: .string) else {
+            errorMessage = "Не удалось скопировать пароль."
+            return
+        }
+
+        showCopyToast("Пароль скопирован")
+        successMessage = "Пароль скопирован в буфер обмена."
+        errorMessage = nil
+    }
+
+    func copyTagDescriptionToPasteboard(for groupName: String) {
+        let normalizedGroupName = groupName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard normalizedGroupName.isEmpty == false else {
+            return
+        }
+
+        guard let description = groupDescriptionsByName[normalizedGroupName] else {
+            return
+        }
+
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+
+        guard pasteboard.setString(description, forType: .string) else {
+            errorMessage = "Не удалось скопировать описание тега."
+            return
+        }
+
+        showCopyToast("Описание тега скопировано")
+        successMessage = "Описание тега скопировано в буфер обмена."
+        errorMessage = nil
+    }
+
     func toggleGroupFilter(_ groupName: String?) {
         if selectedGroupFilter == groupName {
             selectedGroupFilter = nil
@@ -365,6 +447,38 @@ final class ProjectDetailViewModel {
 
         passwordItems = try passwordService.fetchPasswords(projectID: projectID)
         revealedPasswordIDs = revealedPasswordIDs.intersection(Set(passwordItems.map(\.id)))
+    }
+
+    private func updateGroupDescription(basedOn item: ProjectPasswordItem) throws {
+        let normalizedGroupName = item.groupName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard normalizedGroupName.isEmpty == false else {
+            return
+        }
+
+        let groupDescription = item.itemDescription?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        let peers = passwordItems.filter {
+            $0.id != item.id && $0.groupName.localizedCaseInsensitiveCompare(normalizedGroupName) == .orderedSame
+        }
+
+        for peer in peers {
+            var updatedPeer = peer
+            updatedPeer.itemDescription = groupDescription
+            updatedPeer.updatedAt = .now
+            try passwordService.upsert(updatedPeer)
+        }
+    }
+
+    private func showCopyToast(_ message: String) {
+        copyToastHideTask?.cancel()
+        passwordCopyToastMessage = message
+
+        copyToastHideTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 1_400_000_000)
+            guard Task.isCancelled == false else {
+                return
+            }
+            self?.passwordCopyToastMessage = nil
+        }
     }
 
     private func parseOptionalDecimal(_ value: String) -> Decimal? {

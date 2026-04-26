@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct ProjectDetailView: View {
@@ -80,8 +81,11 @@ struct ProjectDetailView: View {
                     set: { viewModel.passwordEditorDraft = $0 }
                 ),
                 existingGroups: viewModel.existingGroupNames,
+                existingGroupDescriptions: viewModel.groupDescriptionsByName,
+                errorMessage: viewModel.passwordEditorErrorMessage,
                 isEditing: viewModel.editingPasswordID != nil,
                 onCancel: {
+                    viewModel.passwordEditorErrorMessage = nil
                     viewModel.isPasswordEditorPresented = false
                 },
                 onSave: {
@@ -379,6 +383,30 @@ private struct ProjectPasswordsTab: View {
                                         .background(AppColors.fieldFill, in: Capsule())
                                 }
 
+                                if let groupDescription = section.groupDescription {
+                                    Text(groupDescription)
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(AppColors.secondaryText)
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 8)
+                                        .background(AppColors.fieldFill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                        .overlay {
+                                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                                .strokeBorder(AppColors.fieldBorder, lineWidth: 1)
+                                        }
+                                        .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                        .onTapGesture {
+                                            viewModel.copyTagDescriptionToPasteboard(for: section.title)
+                                        }
+                                        .onHover { hovering in
+                                            if hovering {
+                                                NSCursor.pointingHand.push()
+                                            } else {
+                                                NSCursor.pop()
+                                            }
+                                        }
+                                }
+
                                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 420), spacing: AppSpacing.lg)], spacing: AppSpacing.lg) {
                                     ForEach(section.items) { item in
                                         ProjectPasswordCard(
@@ -386,6 +414,9 @@ private struct ProjectPasswordsTab: View {
                                             isPasswordVisible: viewModel.isPasswordVisible(item.id),
                                             onToggleVisibility: {
                                                 viewModel.togglePasswordVisibility(for: item.id)
+                                            },
+                                            onCopyPassword: {
+                                                viewModel.copyPasswordToPasteboard(for: item.id)
                                             },
                                             onEdit: {
                                                 viewModel.presentEditPasswordEditor(item)
@@ -402,6 +433,14 @@ private struct ProjectPasswordsTab: View {
                 }
             }
         }
+        .overlay(alignment: .topTrailing) {
+            if let toastMessage = viewModel.passwordCopyToastMessage {
+                CopyToastView(message: toastMessage)
+                    .padding(.top, 6)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .animation(.easeInOut(duration: 0.18), value: viewModel.passwordCopyToastMessage)
     }
 
     private func groupFilterTag(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
@@ -437,10 +476,11 @@ private struct ProjectPasswordCard: View {
     let item: ProjectPasswordItem
     let isPasswordVisible: Bool
     let onToggleVisibility: () -> Void
+    let onCopyPassword: () -> Void
     let onEdit: () -> Void
     let onDelete: () -> Void
     @State private var isHovered = false
-    @State private var isDescriptionExpanded = false
+    @State private var isCopyFieldHovered = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppSpacing.md) {
@@ -487,31 +527,18 @@ private struct ProjectPasswordCard: View {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .strokeBorder(AppColors.fieldBorder, lineWidth: 1)
             }
-
-            if let description = item.itemDescription, description.isEmpty == false {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        isDescriptionExpanded.toggle()
-                    }
-                } label: {
-                    HStack(spacing: AppSpacing.xs) {
-                        Text(isDescriptionExpanded ? "Скрыть описание" : "Показать описание")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(AppColors.secondaryText)
-
-                        Image(systemName: isDescriptionExpanded ? "chevron.up" : "chevron.down")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(AppColors.secondaryText)
-                    }
+            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .onTapGesture(perform: onCopyPassword)
+            .onHover { hovering in
+                guard hovering != isCopyFieldHovered else {
+                    return
                 }
-                .buttonStyle(.plain)
 
-                if isDescriptionExpanded {
-                    Text(description)
-                        .font(.system(size: 12))
-                        .foregroundStyle(AppColors.secondaryText)
-                        .lineLimit(3)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
+                isCopyFieldHovered = hovering
+                if hovering {
+                    NSCursor.pointingHand.push()
+                } else {
+                    NSCursor.pop()
                 }
             }
         }
@@ -532,9 +559,34 @@ private struct ProjectPasswordCard: View {
     }
 }
 
+private struct CopyToastView: View {
+    let message: String
+
+    var body: some View {
+        HStack(spacing: AppSpacing.sm) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(AppColors.successText)
+
+            Text(message)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(AppColors.primaryText)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(AppColors.cardSecondaryFill, in: Capsule())
+        .overlay {
+            Capsule()
+                .strokeBorder(AppColors.fieldBorder, lineWidth: 1)
+        }
+    }
+}
+
 private struct ProjectPasswordEditorSheet: View {
     @Binding var draft: ProjectPasswordDraft
     let existingGroups: [String]
+    let existingGroupDescriptions: [String: String]
+    let errorMessage: String?
     let isEditing: Bool
     let onCancel: () -> Void
     let onSave: () -> Void
@@ -543,12 +595,16 @@ private struct ProjectPasswordEditorSheet: View {
     init(
         draft: Binding<ProjectPasswordDraft>,
         existingGroups: [String],
+        existingGroupDescriptions: [String: String],
+        errorMessage: String?,
         isEditing: Bool,
         onCancel: @escaping () -> Void,
         onSave: @escaping () -> Void
     ) {
         _draft = draft
         self.existingGroups = existingGroups
+        self.existingGroupDescriptions = existingGroupDescriptions
+        self.errorMessage = errorMessage
         self.isEditing = isEditing
         self.onCancel = onCancel
         self.onSave = onSave
@@ -560,6 +616,21 @@ private struct ProjectPasswordEditorSheet: View {
                 .font(.system(size: 24, weight: .semibold))
                 .foregroundStyle(AppColors.primaryText)
 
+            if let errorMessage {
+                HStack(spacing: AppSpacing.sm) {
+                    Circle()
+                        .fill(AppColors.errorText)
+                        .frame(width: 8, height: 8)
+
+                    Text(errorMessage)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(AppColors.primaryText)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(AppColors.errorText.opacity(AppearancePreferences.isDarkMode ? 0.16 : 0.12), in: Capsule())
+            }
+
             HStack(alignment: .top, spacing: AppSpacing.xl) {
                 VStack(alignment: .leading, spacing: AppSpacing.lg) {
                     ProjectFormField(title: "Название") {
@@ -567,14 +638,14 @@ private struct ProjectPasswordEditorSheet: View {
                             .textFieldStyle(.plain)
                     }
 
-                    ProjectFormField(title: "Группа") {
-                        TextField("Например, Инфраструктура", text: $draft.groupName)
+                    ProjectFormField(title: "Тег") {
+                        TextField("Например, LOGIN", text: $draft.groupName)
                             .textFieldStyle(.plain)
                     }
 
                     if existingGroups.isEmpty == false {
                         VStack(alignment: .leading, spacing: AppSpacing.sm) {
-                            Text("Существующие группы")
+                            Text("Существующие теги")
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundStyle(AppColors.secondaryText)
 
@@ -600,6 +671,13 @@ private struct ProjectPasswordEditorSheet: View {
                             }
                         }
                     }
+
+                    ProjectNotesField(
+                        text: $draft.itemDescription,
+                        title: "Описание для тега",
+                        minHeight: 140,
+                        placeholder: "Описание относится к выбранному тегу. Для нового тега поле будет пустым."
+                    )
                 }
                 .frame(maxWidth: .infinity, alignment: .topLeading)
 
@@ -625,13 +703,6 @@ private struct ProjectPasswordEditorSheet: View {
                             .buttonStyle(.plain)
                         }
                     }
-
-                    ProjectNotesField(
-                        text: $draft.itemDescription,
-                        title: "Описание",
-                        minHeight: 210,
-                        placeholder: "Необязательная подсказка для команды или себя."
-                    )
                 }
                 .frame(maxWidth: .infinity, alignment: .topLeading)
             }
@@ -650,6 +721,30 @@ private struct ProjectPasswordEditorSheet: View {
         .padding(24)
         .frame(width: 760)
         .background(AppColors.windowBackground)
+        .onAppear {
+            syncDescriptionWithSelectedTag()
+        }
+        .onChange(of: draft.groupName) { _, _ in
+            syncDescriptionWithSelectedTag()
+        }
+    }
+
+    private func syncDescriptionWithSelectedTag() {
+        let selectedTag = draft.groupName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard selectedTag.isEmpty == false else {
+            draft.itemDescription = ""
+            return
+        }
+
+        if let description = existingGroupDescriptions[selectedTag] {
+            draft.itemDescription = description
+            return
+        }
+
+        let key = existingGroupDescriptions.keys.first {
+            $0.localizedCaseInsensitiveCompare(selectedTag) == .orderedSame
+        }
+        draft.itemDescription = key.flatMap { existingGroupDescriptions[$0] } ?? ""
     }
 }
 
