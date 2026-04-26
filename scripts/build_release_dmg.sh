@@ -13,6 +13,7 @@ APP_DIR="$ARTIFACTS_DIR/Packaging/${APP_NAME}.app"
 DMG_ROOT_DIR="$ARTIFACTS_DIR/DMGRoot"
 DMG_PATH="$ARTIFACTS_DIR/${APP_NAME}.dmg"
 ASSET_CATALOG_DIR="$ROOT_DIR/WorkTimeTracker/Resources/Assets.xcassets"
+mkdir -p "$ARTIFACTS_DIR"
 ICON_BUILD_DIR="$(mktemp -d "$ARTIFACTS_DIR/app-icon.XXXXXX")"
 ICON_INFO_PLIST="$ICON_BUILD_DIR/IconInfo.plist"
 

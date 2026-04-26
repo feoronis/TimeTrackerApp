@@ -29,7 +29,7 @@ enum AppearancePreferences {
             break
         }
 
-        let appearance = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua])
+        let appearance = NSApp?.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua])
         return appearance == .darkAqua
     }
 
