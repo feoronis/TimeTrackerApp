@@ -17,6 +17,7 @@ final class AppEnvironment {
     let backupService: BackupService
     let exportService: ExportService
     let importService: ImportService
+    let projectPasswordService: ProjectPasswordService
     let notificationService: NotificationService
     let cloudSyncStatusService: CloudSyncStatusService
     private(set) var dataChangeToken = UUID()
@@ -26,7 +27,8 @@ final class AppEnvironment {
 
     init(
         modelContainer: ModelContainer,
-        cloudSyncStartupState: CloudSyncStartupState = CloudSyncStartupState(mode: .localOnly)
+        cloudSyncStartupState: CloudSyncStartupState = CloudSyncStartupState(mode: .localOnly),
+        projectPasswordService: ProjectPasswordService? = nil
     ) {
         self.modelContainer = modelContainer
 
@@ -45,6 +47,7 @@ final class AppEnvironment {
             sessionCalculator: sessionCalculator
         )
         reportService = ReportService(sessionCalculator: sessionCalculator)
+        self.projectPasswordService = projectPasswordService ?? ProjectPasswordService()
         exportService = ExportService(
             projectRepository: projectRepository,
             sessionRepository: sessionRepository,

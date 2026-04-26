@@ -28,3 +28,15 @@ clang-module-cache/
 
 # App-specific local files
 *.log
+
+# Local app runtime data
+*.store
+*.store-shm
+*.store-wal
+RecoveredStores/
+
+# Local backups and exports
+Backups/
+backup-*.json
+work-time-export-*.json
+work-time-sessions-*.csv

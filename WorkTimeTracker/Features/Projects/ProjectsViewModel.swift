@@ -1,6 +1,11 @@
 import Foundation
 import Observation
 
+enum ProjectDetailDestination: Equatable {
+    case create
+    case project(UUID)
+}
+
 @MainActor
 @Observable
 final class ProjectsViewModel {
@@ -8,22 +13,17 @@ final class ProjectsViewModel {
     private let sessionRepository: SessionRepository
     private let settingsRepository: SettingsRepository
     private let sessionCalculator: SessionCalculator
-    private let appEnvironment: AppEnvironment
 
     private(set) var projects: [Project] = []
     private(set) var projectRows: [ProjectListRow] = []
     private(set) var settings: AppSettings?
-    var isEditorPresented = false
-    var editorDraft = ProjectDraft()
     var searchText = ""
     var showArchived = true
-    var editingProject: Project?
     var errorMessage: String?
-    var isDeleteConfirmationPresented = false
-    var projectPendingDeletion: Project?
+    var destination: ProjectDetailDestination?
+    var selectedDetailTab: ProjectDetailTab = .general
 
     init(appEnvironment: AppEnvironment) {
-        self.appEnvironment = appEnvironment
         self.projectRepository = appEnvironment.projectRepository
         self.sessionRepository = appEnvironment.sessionRepository
         self.settingsRepository = appEnvironment.settingsRepository
@@ -44,12 +44,20 @@ final class ProjectsViewModel {
             }
     }
 
-    var colorOptions: [String] {
-        ["#7C5CFF", "#5B7CFA", "#5CC47D", "#FFB86B", "#FF7A7A", "#FF7AC3", "#9CA3AF"]
+    var selectedProjectID: UUID? {
+        if case let .project(projectID) = destination {
+            return projectID
+        }
+
+        return nil
     }
 
-    var iconOptions: [String] {
-        ["folder", "hammer", "desktopcomputer", "iphone", "paintpalette", "globe", "cart", "briefcase"]
+    var selectedProject: Project? {
+        guard let selectedProjectID else {
+            return nil
+        }
+
+        return projects.first { $0.id == selectedProjectID }
     }
 
     func load() {
@@ -58,104 +66,27 @@ final class ProjectsViewModel {
             projects = try projectRepository.fetchAll()
             let sessions = try sessionRepository.fetchAll()
             projectRows = buildProjectRows(projects: projects, sessions: sessions)
+            reconcileSelection()
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
         }
     }
 
-    func presentCreateSheet() {
-        editingProject = nil
-        editorDraft = ProjectDraft()
-        isEditorPresented = true
+    func presentCreateDetail() {
+        destination = .create
+        errorMessage = nil
     }
 
-    func presentEditSheet(for project: Project) {
-        editingProject = project
-        editorDraft = ProjectDraft(project: project)
-        isEditorPresented = true
-    }
-
-    func requestDeleteEditingProject() {
-        guard let editingProject else { return }
-        projectPendingDeletion = editingProject
-        isDeleteConfirmationPresented = true
-    }
-
-    func deletePendingProject() {
-        guard let projectPendingDeletion else { return }
-
-        do {
-            let linkedSessions = try sessionRepository.fetchSessions(projectID: projectPendingDeletion.id)
-            try sessionRepository.delete(linkedSessions)
-            try projectRepository.delete(projectPendingDeletion)
-            try appEnvironment.timerService.restoreActiveSessionIfNeeded()
-
-            if editingProject?.id == projectPendingDeletion.id {
-                editingProject = nil
-            }
-
-            self.projectPendingDeletion = nil
-            isDeleteConfirmationPresented = false
-            errorMessage = nil
-            appEnvironment.notifyDataChanged()
-            load()
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    func saveProject() {
-        let trimmedName = editorDraft.name.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        guard trimmedName.isEmpty == false else {
-            errorMessage = "Название проекта обязательно."
-            return
-        }
-
-        let hourlyRate = parseOptionalDecimal(editorDraft.hourlyRateText)
-
-        guard editorDraft.hourlyRateText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || hourlyRate != nil else {
-            errorMessage = "Ставка должна быть числом."
-            return
-        }
-
-        do {
-            if let editingProject {
-                editingProject.name = trimmedName
-                editingProject.colorHex = normalizedHex(editorDraft.colorHex)
-                editingProject.iconName = editorDraft.iconName.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
-                editingProject.hourlyRate = hourlyRate
-                editingProject.notes = editorDraft.notes.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
-                editingProject.isArchived = editorDraft.isArchived
-                editingProject.updatedAt = .now
-                try projectRepository.save()
-            } else {
-                let project = Project(
-                    name: trimmedName,
-                    colorHex: normalizedHex(editorDraft.colorHex),
-                    iconName: editorDraft.iconName.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
-                    hourlyRate: hourlyRate,
-                    isArchived: editorDraft.isArchived,
-                    notes: editorDraft.notes.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
-                )
-                try projectRepository.insert(project)
-            }
-
-            isEditorPresented = false
-            errorMessage = nil
-            appEnvironment.notifyDataChanged()
-            load()
-        } catch {
-            errorMessage = error.localizedDescription
-        }
+    func selectProject(_ projectID: UUID) {
+        destination = .project(projectID)
+        errorMessage = nil
     }
 
     func archive(_ project: Project) {
         do {
             try projectRepository.archive(project)
             errorMessage = nil
-            appEnvironment.notifyDataChanged()
             load()
         } catch {
             errorMessage = error.localizedDescription
@@ -166,10 +97,32 @@ final class ProjectsViewModel {
         do {
             try projectRepository.unarchive(project)
             errorMessage = nil
-            appEnvironment.notifyDataChanged()
             load()
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    func handleProjectSaved(projectID: UUID) {
+        destination = .project(projectID)
+        load()
+    }
+
+    func handleProjectDeleted(projectID: UUID) {
+        load()
+        destination = nil
+    }
+
+    private func reconcileSelection() {
+        switch destination {
+        case .create:
+            return
+        case let .project(projectID):
+            if projects.contains(where: { $0.id == projectID }) == false {
+                destination = nil
+            }
+        case nil:
+            return
         }
     }
 
@@ -196,25 +149,6 @@ final class ProjectsViewModel {
             }
             return lhs.totalIncome > rhs.totalIncome
         }
-    }
-
-    private func parseOptionalDecimal(_ value: String) -> Decimal? {
-        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        guard trimmedValue.isEmpty == false else {
-            return nil
-        }
-
-        return Decimal(string: trimmedValue.replacingOccurrences(of: ",", with: "."))
-    }
-
-    private func normalizedHex(_ value: String) -> String {
-        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmedValue.isEmpty == false else {
-            return "#7C5CFF"
-        }
-
-        return trimmedValue.hasPrefix("#") ? trimmedValue : "#\(trimmedValue)"
     }
 }
 
